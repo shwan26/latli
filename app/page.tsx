@@ -1,65 +1,296 @@
-import Image from "next/image";
+import Link from "next/link"
+import {
+  IconArrowRight,
+  IconBrandLine,
+  IconChartBar,
+  IconCheck,
+  IconClock,
+  IconCreditCard,
+  IconPackage,
+  IconReceipt,
+  IconRoute,
+  IconShieldCheck,
+  IconShoppingBag,
+  IconTruckDelivery,
+  IconUsers,
+} from "@tabler/icons-react"
+
+import { Button } from "@/components/ui/button"
+
+const workflow = [
+  {
+    title: "Order captured",
+    detail: "Photo, option, size, color, customer note",
+    icon: IconReceipt,
+  },
+  {
+    title: "Retailer purchase",
+    detail: "Track cost, selling price, and item status",
+    icon: IconShoppingBag,
+  },
+  {
+    title: "Payment control",
+    detail: "Deposits, unpaid balances, THB and MMK views",
+    icon: IconCreditCard,
+  },
+  {
+    title: "Cargo handoff",
+    detail: "Cargo company, tracking number, delivery progress",
+    icon: IconTruckDelivery,
+  },
+]
+
+const metrics = [
+  { label: "Orders to buy", value: "24", icon: IconPackage },
+  { label: "Waiting payment", value: "18", icon: IconClock },
+  { label: "In delivery", value: "31", icon: IconRoute },
+  { label: "Customers", value: "146", icon: IconUsers },
+]
+
+const features = [
+  "One place for retailer cost, customer payable, profit, and exchange rate",
+  "Mobile-first order entry for Facebook, Line, screenshot, and photo orders",
+  "Customer history with repeat buyers and monthly spending summaries",
+  "Operational dashboard for buying, payment follow-up, and delivery handoff",
+]
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-dvh bg-[#f7f4ee] text-[#171512]">
+      <header className="border-b border-[#ded6c9] bg-[#fbfaf7]/90 px-5 py-4 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
+          <Link href="/" className="flex items-center gap-3">
+            <span className="flex size-10 items-center justify-center rounded-lg bg-[#171512] text-[#f8f2e8]">
+              <IconShoppingBag className="size-5" />
+            </span>
+            <span className="font-heading text-xl font-semibold">Latli</span>
+          </Link>
+
+          <nav className="hidden items-center gap-7 text-sm font-medium text-[#605848] md:flex">
+            <Link href="/dashboard" className="transition hover:text-[#171512]">
+              Dashboard
+            </Link>
+            <Link href="/orders" className="transition hover:text-[#171512]">
+              Orders
+            </Link>
+            <Link href="/customers" className="transition hover:text-[#171512]">
+              Customers
+            </Link>
+          </nav>
+
+          <Button asChild className="h-10 rounded-lg px-5 tracking-normal">
+            <Link href="/login">Login</Link>
+          </Button>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      <section className="border-b border-[#ded6c9] bg-[#fbfaf7] px-5">
+        <div className="mx-auto grid min-h-[calc(100dvh-73px)] w-full max-w-6xl items-center gap-10 py-12 md:grid-cols-[0.95fr_1.05fr] md:py-16">
+          <div className="max-w-xl">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-lg border border-[#d8c7ad] bg-[#fffaf1] px-3 py-2 text-sm font-medium text-[#6f4b1e]">
+              <IconShieldCheck className="size-4" />
+              Retailer process management
+            </div>
+
+            <h1 className="font-heading text-5xl font-semibold leading-[1.03] md:text-7xl">
+              Run every retail order from request to delivery.
+            </h1>
+
+            <p className="mt-6 max-w-lg text-lg leading-8 text-[#605848]">
+              Latli keeps shop owners in control of product buying, customer
+              balances, THB/MMK conversion, cargo handoff, and repeat customer
+              history without spreading work across chat, notes, and sheets.
+            </p>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Button
+                asChild
+                size="lg"
+                className="h-12 rounded-lg px-6 text-sm tracking-normal"
+              >
+                <Link href="/dashboard">
+                  Open dashboard
+                  <IconArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="h-12 rounded-lg border-[#cfc4b4] bg-transparent px-6 text-sm tracking-normal hover:bg-[#eee7dc]"
+              >
+                <Link href="/orders/create">Create order</Link>
+              </Button>
+            </div>
+
+            <div className="mt-10 grid grid-cols-3 gap-4 border-t border-[#ded6c9] pt-6">
+              <Stat value="4" label="Core flows" />
+              <Stat value="2" label="Currencies" />
+              <Stat value="1" label="Owner view" />
+            </div>
+          </div>
+
+          <ProcessPreview />
         </div>
-      </main>
+      </section>
+
+      <section className="px-5 py-16 md:py-20">
+        <div className="mx-auto w-full max-w-6xl">
+          <div className="grid gap-4 md:grid-cols-4">
+            {metrics.map((metric) => (
+              <MetricCard key={metric.label} {...metric} />
+            ))}
+          </div>
+
+          <div className="mt-16 grid gap-10 md:grid-cols-[0.9fr_1.1fr] md:items-start">
+            <div>
+              <p className="text-sm font-semibold uppercase text-[#8a5a20]">
+                Built for daily operations
+              </p>
+              <h2 className="mt-3 font-heading text-4xl font-semibold leading-tight">
+                A focused back office for retailers who sell through messages.
+              </h2>
+            </div>
+
+            <div className="grid gap-3">
+              {features.map((feature) => (
+                <div
+                  key={feature}
+                  className="flex gap-3 rounded-lg border border-[#ded6c9] bg-[#fbfaf7] p-4"
+                >
+                  <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-[#184f3b] text-white">
+                    <IconCheck className="size-4" />
+                  </span>
+                  <p className="leading-7 text-[#4d463b]">{feature}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function ProcessPreview() {
+  return (
+    <div className="relative">
+      <div className="absolute inset-0 translate-x-4 translate-y-4 rounded-lg bg-[#171512]" />
+      <div className="relative overflow-hidden rounded-lg border border-[#cfc4b4] bg-[#fdfbf7] shadow-2xl shadow-[#3d2c16]/15">
+        <div className="flex items-center justify-between border-b border-[#ded6c9] px-5 py-4">
+          <div>
+            <p className="text-sm text-[#736b5f]">Today</p>
+            <h2 className="font-heading text-2xl font-semibold">Retail desk</h2>
+          </div>
+          <span className="flex size-11 items-center justify-center rounded-lg bg-[#184f3b] text-white">
+            <IconChartBar className="size-5" />
+          </span>
+        </div>
+
+        <div className="grid gap-4 p-5 sm:grid-cols-[0.88fr_1.12fr]">
+          <div className="space-y-3">
+            <PreviewTile label="Unpaid balance" value="฿42,800" tone="green" />
+            <PreviewTile label="Converted total" value="MMK 4.7M" />
+            <PreviewTile label="Profit" value="฿12,450" tone="dark" />
+          </div>
+
+          <div className="space-y-3">
+            {workflow.map((item, index) => {
+              const Icon = item.icon
+
+              return (
+                <div
+                  key={item.title}
+                  className="flex gap-3 rounded-lg border border-[#e3dbcf] bg-white p-3"
+                >
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#eee7dc]">
+                    <Icon className="size-5 text-[#5f4d35]" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-[#9a6a2f]">
+                        0{index + 1}
+                      </span>
+                      <h3 className="truncate text-sm font-semibold">
+                        {item.title}
+                      </h3>
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-[#736b5f]">
+                      {item.detail}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="border-t border-[#ded6c9] bg-[#f4efe7] px-5 py-4">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-[#5f4d35]">
+            <span className="flex items-center gap-2 rounded-lg bg-white px-3 py-2">
+              <IconBrandLine className="size-4" />
+              Line retailer
+            </span>
+            <span className="rounded-lg bg-white px-3 py-2">Facebook order</span>
+            <span className="rounded-lg bg-white px-3 py-2">Cargo tracking</span>
+          </div>
+        </div>
+      </div>
     </div>
-  );
+  )
+}
+
+function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <div>
+      <p className="font-heading text-3xl font-semibold">{value}</p>
+      <p className="mt-1 text-sm text-[#605848]">{label}</p>
+    </div>
+  )
+}
+
+function MetricCard({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string
+  value: string
+  icon: React.ElementType
+}) {
+  return (
+    <div className="rounded-lg border border-[#ded6c9] bg-[#fbfaf7] p-5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex size-10 items-center justify-center rounded-lg bg-[#eee7dc]">
+          <Icon className="size-5 text-[#5f4d35]" />
+        </span>
+        <p className="font-heading text-3xl font-semibold">{value}</p>
+      </div>
+      <p className="mt-4 text-sm font-medium text-[#605848]">{label}</p>
+    </div>
+  )
+}
+
+function PreviewTile({
+  label,
+  value,
+  tone = "light",
+}: {
+  label: string
+  value: string
+  tone?: "light" | "green" | "dark"
+}) {
+  const className =
+    tone === "green"
+      ? "bg-[#184f3b] text-white"
+      : tone === "dark"
+        ? "bg-[#171512] text-white"
+        : "bg-[#eee7dc] text-[#171512]"
+
+  return (
+    <div className={`rounded-lg p-4 ${className}`}>
+      <p className="text-xs opacity-75">{label}</p>
+      <p className="mt-2 font-heading text-2xl font-semibold">{value}</p>
+    </div>
+  )
 }
