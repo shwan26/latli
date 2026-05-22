@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -11,6 +11,7 @@ import {
   IconCamera,
   IconDeviceFloppy,
   IconMessage2,
+  IconSparkles,
   IconTruckDelivery,
   IconUser,
 } from "@tabler/icons-react"
@@ -153,8 +154,383 @@ function readFileAsDataUrl(file: File) {
   })
 }
 
+type ImageBounds = {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+type ScreenshotExtraction = {
+  customerName: string
+  productSize: string
+  productColor: string
+  customerMessage: string
+  productPhotoDataUrl: string
+  ocrText: string
+}
+
+const colorWords = [
+  "black",
+  "white",
+  "red",
+  "blue",
+  "green",
+  "yellow",
+  "pink",
+  "purple",
+  "brown",
+  "gray",
+  "grey",
+  "beige",
+  "cream",
+  "navy",
+  "orange",
+]
+
+const ignoredNameLines = [
+  "intake",
+  "active now",
+  "reply",
+  "suggested",
+  "create order",
+  "mark as lead",
+  "hello",
+  "min thuka",
+]
+
+const myanmarDigits: Record<string, string> = {
+  "၀": "0",
+  "၁": "1",
+  "၂": "2",
+  "၃": "3",
+  "၄": "4",
+  "၅": "5",
+  "၆": "6",
+  "၇": "7",
+  "၈": "8",
+  "၉": "9",
+}
+
+function normalizeDigits(value: string) {
+  return value.replace(/[၀-၉]/g, (digit) => myanmarDigits[digit] ?? digit)
+}
+
+function normalizeOcrLine(value: string) {
+  return normalizeDigits(value)
+    .replace(/[|_*~]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function parseCustomerName(text: string) {
+  const lines = text
+    .split(/\n+/)
+    .map(normalizeOcrLine)
+    .filter(Boolean)
+
+  const nameLine = lines.find((line) => {
+    const lower = line.toLowerCase()
+    const hasLetters = /[a-z]/i.test(line)
+    const hasMostlyNameChars = /^[a-z .'-]+$/i.test(line)
+    const isIgnored = ignoredNameLines.some((word) => lower.includes(word))
+    const isStatusLine = /\b\d{1,2}[:.]\d{2}\b|[0-9]{2,}|pm|am|lte|5g|4g/i.test(
+      line
+    )
+
+    return hasLetters && hasMostlyNameChars && !isIgnored && !isStatusLine
+  })
+
+  return nameLine?.replace(/\s+\.+$/, "...") ?? ""
+}
+
+function parseSizeAndColor(text: string) {
+  const normalized = normalizeDigits(text).replace(/\s+/g, " ")
+  const colorSizeMatch = normalized.match(
+    /\b(black|white|red|blue|green|yellow|pink|purple|brown|gr[ae]y|beige|cream|navy|orange)\s*[-:/]?\s*(\d{2}|xxxl|xxl|xl|xs|s|m|l)\b/i
+  )
+
+  if (colorSizeMatch) {
+    return {
+      productColor: toTitleCase(colorSizeMatch[1]),
+      productSize: colorSizeMatch[2].toUpperCase(),
+    }
+  }
+
+  const explicitSizeMatch = normalized.match(
+    /(?:size|ဆိုဒ်)\s*[:.\-]?\s*(\d{2}|xxxl|xxl|xl|xs|s|m|l)|(\d{2}|xxxl|xxl|xl|xs|s|m|l)\s*[:.\-]?\s*(?:size|ဆိုဒ်)/i
+  )
+  const colorMatch = normalized.match(
+    new RegExp(`\\b(${colorWords.join("|")})\\b`, "i")
+  )
+  const productSize = explicitSizeMatch
+    ? (explicitSizeMatch[1] || explicitSizeMatch[2]).toUpperCase()
+    : ""
+
+  return {
+    productColor: colorMatch ? toTitleCase(colorMatch[1]) : "",
+    productSize,
+  }
+}
+
+function toTitleCase(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+}
+
+function parseCustomerMessage(text: string) {
+  return text
+    .split(/\n+/)
+    .map(normalizeOcrLine)
+    .filter((line) => /[\u1000-\u109f]/.test(line))
+    .slice(-3)
+    .join("\n")
+}
+
+function getImageElement(dataUrl: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new window.Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error("Could not load screenshot."))
+    image.src = dataUrl
+  })
+}
+
+function getImageDataUrl(
+  image: HTMLImageElement,
+  bounds: ImageBounds,
+  type = "image/jpeg",
+  quality = 0.9
+) {
+  const canvas = document.createElement("canvas")
+  const context = canvas.getContext("2d")
+
+  if (!context) return ""
+
+  canvas.width = Math.max(1, Math.round(bounds.width))
+  canvas.height = Math.max(1, Math.round(bounds.height))
+  context.drawImage(
+    image,
+    bounds.left,
+    bounds.top,
+    bounds.width,
+    bounds.height,
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  )
+
+  return canvas.toDataURL(type, quality)
+}
+
+function findLikelyProductBounds(image: HTMLImageElement): ImageBounds {
+  const width = image.naturalWidth
+  const height = image.naturalHeight
+  const canvas = document.createElement("canvas")
+  const context = canvas.getContext("2d", { willReadFrequently: true })
+
+  if (!context) {
+    return {
+      left: Math.round(width * 0.08),
+      top: Math.round(height * 0.16),
+      width: Math.round(width * 0.84),
+      height: Math.round(height * 0.45),
+    }
+  }
+
+  const sampleWidth = 120
+  const sampleHeight = Math.max(160, Math.round((height / width) * sampleWidth))
+  canvas.width = sampleWidth
+  canvas.height = sampleHeight
+  context.drawImage(image, 0, 0, sampleWidth, sampleHeight)
+
+  const imageData = context.getImageData(0, 0, sampleWidth, sampleHeight).data
+  const visited = new Uint8Array(sampleWidth * sampleHeight)
+  const minY = Math.round(sampleHeight * 0.12)
+  const maxY = Math.round(sampleHeight * 0.9)
+  let best = { left: 0, top: 0, right: 0, bottom: 0, area: 0 }
+
+  function isCandidatePixel(x: number, y: number) {
+    const index = (y * sampleWidth + x) * 4
+    const red = imageData[index]
+    const green = imageData[index + 1]
+    const blue = imageData[index + 2]
+    const max = Math.max(red, green, blue)
+    const min = Math.min(red, green, blue)
+
+    if (y < minY || y > maxY) return false
+    if (max > 245 && min > 235) return false
+    if (max < 18 && min < 18) return false
+    if (blue > 170 && red < 90 && green < 160) return false
+
+    return max - min > 10 || max < 225
+  }
+
+  for (let y = minY; y < maxY; y += 1) {
+    for (let x = 0; x < sampleWidth; x += 1) {
+      const start = y * sampleWidth + x
+
+      if (visited[start] || !isCandidatePixel(x, y)) continue
+
+      const queue = [start]
+      visited[start] = 1
+      let pointer = 0
+      let left = x
+      let right = x
+      let top = y
+      let bottom = y
+      let area = 0
+
+      while (pointer < queue.length) {
+        const current = queue[pointer]
+        pointer += 1
+        area += 1
+
+        const currentX = current % sampleWidth
+        const currentY = Math.floor(current / sampleWidth)
+        left = Math.min(left, currentX)
+        right = Math.max(right, currentX)
+        top = Math.min(top, currentY)
+        bottom = Math.max(bottom, currentY)
+
+        const neighbors = [
+          current - 1,
+          current + 1,
+          current - sampleWidth,
+          current + sampleWidth,
+        ]
+
+        for (const next of neighbors) {
+          if (next < 0 || next >= visited.length || visited[next]) continue
+
+          const nextX = next % sampleWidth
+          const nextY = Math.floor(next / sampleWidth)
+          const crossesRow =
+            Math.abs(nextX - currentX) > 1 || Math.abs(nextY - currentY) > 1
+
+          if (crossesRow || !isCandidatePixel(nextX, nextY)) continue
+
+          visited[next] = 1
+          queue.push(next)
+        }
+      }
+
+      const componentWidth = right - left + 1
+      const componentHeight = bottom - top + 1
+      const isLargeEnough = componentWidth > 22 && componentHeight > 22
+      const isTooWideChrome =
+        componentWidth > sampleWidth * 0.92 && componentHeight < 28
+
+      if (isLargeEnough && !isTooWideChrome && area > best.area) {
+        best = { left, top, right, bottom, area }
+      }
+    }
+  }
+
+  if (!best.area) {
+    return {
+      left: Math.round(width * 0.08),
+      top: Math.round(height * 0.16),
+      width: Math.round(width * 0.84),
+      height: Math.round(height * 0.45),
+    }
+  }
+
+  const scaleX = width / sampleWidth
+  const scaleY = height / sampleHeight
+  const paddingX = width * 0.015
+  const paddingY = height * 0.012
+  const left = Math.max(0, Math.floor(best.left * scaleX - paddingX))
+  const top = Math.max(0, Math.floor(best.top * scaleY - paddingY))
+  const right = Math.min(
+    width,
+    Math.ceil((best.right + 1) * scaleX + paddingX)
+  )
+  const bottom = Math.min(
+    height,
+    Math.ceil((best.bottom + 1) * scaleY + paddingY)
+  )
+
+  return {
+    left,
+    top,
+    width: right - left,
+    height: bottom - top,
+  }
+}
+
+async function extractScreenshotOrderData(
+  file: File,
+  dataUrl: string,
+  onProgress: (message: string) => void
+): Promise<ScreenshotExtraction> {
+  const image = await getImageElement(dataUrl)
+  const productBounds = findLikelyProductBounds(image)
+  const productPhotoDataUrl = getImageDataUrl(image, productBounds) || dataUrl
+  const { createWorker, PSM } = await import("tesseract.js")
+  const workerOptions = {
+    logger: (message: { status?: string; progress?: number }) => {
+      if (message.status) {
+        onProgress(
+          `${message.status}${message.progress ? ` ${Math.round(message.progress * 100)}%` : ""}`
+        )
+      }
+    },
+  }
+  let worker: Awaited<ReturnType<typeof createWorker>>
+
+  try {
+    worker = await createWorker("eng+mya", 1, workerOptions)
+  } catch {
+    worker = await createWorker("eng", 1, workerOptions)
+  }
+
+  try {
+    await worker.setParameters({
+      preserve_interword_spaces: "1",
+      tessedit_pageseg_mode: PSM.SPARSE_TEXT,
+    })
+
+    onProgress("Reading customer name...")
+    const nameResult = await worker.recognize(file, {
+      rectangle: {
+        left: Math.round(image.naturalWidth * 0.12),
+        top: Math.round(image.naturalHeight * 0.04),
+        width: Math.round(image.naturalWidth * 0.76),
+        height: Math.round(image.naturalHeight * 0.22),
+      },
+    })
+
+    onProgress("Reading order details...")
+    const detailResult = await worker.recognize(file, {
+      rectangle: {
+        left: Math.round(image.naturalWidth * 0.15),
+        top: Math.round(image.naturalHeight * 0.28),
+        width: Math.round(image.naturalWidth * 0.82),
+        height: Math.round(image.naturalHeight * 0.5),
+      },
+    })
+    const fullResult = await worker.recognize(file)
+    const fullText = fullResult.data.text
+    const detailText = detailResult.data.text
+    const details = parseSizeAndColor(`${detailText}\n${fullText}`)
+
+    return {
+      customerName: parseCustomerName(nameResult.data.text || fullText),
+      productSize: details.productSize,
+      productColor: details.productColor,
+      customerMessage: parseCustomerMessage(fullText),
+      productPhotoDataUrl,
+      ocrText: `${detailText}\n${fullText}`.trim(),
+    }
+  } finally {
+    await worker.terminate()
+  }
+}
+
 export default function CreateOrderPage() {
   const router = useRouter()
+  const extractionIdRef = useRef(0)
 
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
@@ -177,6 +553,9 @@ export default function CreateOrderPage() {
     useState<LocalOrder["deliveryStatus"]>("not_arranged")
   const [productPhotoFile, setProductPhotoFile] = useState<File | null>(null)
   const [productPhotoPreview, setProductPhotoPreview] = useState("")
+  const [orderScreenshotPreview, setOrderScreenshotPreview] = useState("")
+  const [ocrStatus, setOcrStatus] = useState("")
+  const [ocrText, setOcrText] = useState("")
 
   async function handleProductPhotoChange(
     event: React.ChangeEvent<HTMLInputElement>
@@ -184,8 +563,13 @@ export default function CreateOrderPage() {
     setError("")
 
     const file = event.target.files?.[0] ?? null
+    const extractionId = extractionIdRef.current + 1
+    extractionIdRef.current = extractionId
     setProductPhotoFile(file)
     setProductPhotoPreview("")
+    setOrderScreenshotPreview("")
+    setOcrStatus("")
+    setOcrText("")
 
     if (!file) {
       return
@@ -199,11 +583,55 @@ export default function CreateOrderPage() {
     }
 
     try {
-      setProductPhotoPreview(await readFileAsDataUrl(file))
+      const screenshotDataUrl = await readFileAsDataUrl(file)
+      setOrderScreenshotPreview(screenshotDataUrl)
+      setProductPhotoPreview(screenshotDataUrl)
+      setOcrStatus("Preparing screenshot...")
+
+      const extraction = await extractScreenshotOrderData(
+        file,
+        screenshotDataUrl,
+        (message) => {
+          if (extractionIdRef.current === extractionId) {
+            setOcrStatus(message)
+          }
+        }
+      )
+
+      if (extractionIdRef.current !== extractionId) return
+
+      setProductPhotoPreview(extraction.productPhotoDataUrl)
+      setOcrText(extraction.ocrText)
+      setCustomerName((value) => value || extraction.customerName)
+      setFacebookName((value) => value || extraction.customerName)
+      setProductSize((value) => value || extraction.productSize)
+      setProductColor((value) => value || extraction.productColor)
+      setCustomerMessage((value) => value || extraction.customerMessage)
+      setProductDescription((value) => {
+        if (value) return value
+
+        const parts = [
+          extraction.productColor && `Color: ${extraction.productColor}`,
+          extraction.productSize && `Size: ${extraction.productSize}`,
+        ].filter(Boolean)
+
+        return parts.join("\n")
+      })
+      setOcrStatus("Screenshot details filled. Please review before saving.")
     } catch {
-      setError("Could not preview the product photo. Please choose another image.")
-      setProductPhotoFile(null)
-      event.target.value = ""
+      try {
+        const screenshotDataUrl = await readFileAsDataUrl(file)
+        if (extractionIdRef.current !== extractionId) return
+        setOrderScreenshotPreview(screenshotDataUrl)
+        setProductPhotoPreview(screenshotDataUrl)
+        setOcrStatus(
+          "Could not read screenshot automatically. You can fill the fields manually."
+        )
+      } catch {
+        setError("Could not preview the product photo. Please choose another image.")
+        setProductPhotoFile(null)
+        event.target.value = ""
+      }
     }
   }
 
@@ -240,6 +668,8 @@ export default function CreateOrderPage() {
       const existingOrders = getStoredOrders()
       const productPhotoDataUrl =
         productPhotoPreview || (await readFileAsDataUrl(productPhotoFile))
+      const orderScreenshotDataUrl =
+        orderScreenshotPreview || productPhotoDataUrl
 
       const totalRetailerCostThb = costPriceNumber * quantityNumber
       const totalCustomerPayableThb = sellingPriceNumber * quantityNumber
@@ -288,7 +718,7 @@ export default function CreateOrderPage() {
         productPhotoName: productPhotoFile.name,
         productPhotoDataUrl,
         orderScreenshotName: productPhotoFile.name,
-        orderScreenshotDataUrl: productPhotoDataUrl,
+        orderScreenshotDataUrl,
       }
 
       const updatedOrders = [newOrder, ...existingOrders]
@@ -342,7 +772,8 @@ export default function CreateOrderPage() {
               Product Photo
             </CardTitle>
             <CardDescription>
-              Upload the photo the customer sent for the product.
+              Upload the Messenger screenshot. The product image and customer
+              details will be extracted where possible.
             </CardDescription>
           </CardHeader>
 
@@ -355,15 +786,41 @@ export default function CreateOrderPage() {
             />
 
             {productPhotoPreview ? (
-              <div className="overflow-hidden rounded-2xl border bg-background">
-                <Image
-                  src={productPhotoPreview}
-                  alt="Product photo preview"
-                  width={800}
-                  height={800}
-                  unoptimized
-                  className="max-h-96 w-full object-contain"
-                />
+              <div className="space-y-3">
+                <div className="overflow-hidden rounded-2xl border bg-background">
+                  <Image
+                    src={productPhotoPreview}
+                    alt="Product photo preview"
+                    width={800}
+                    height={800}
+                    unoptimized
+                    className="max-h-96 w-full object-contain"
+                  />
+                </div>
+
+                {orderScreenshotPreview &&
+                orderScreenshotPreview !== productPhotoPreview ? (
+                  <details className="rounded-xl border bg-background px-3 py-2">
+                    <summary className="cursor-pointer text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Original screenshot
+                    </summary>
+                    <Image
+                      src={orderScreenshotPreview}
+                      alt="Original order screenshot"
+                      width={800}
+                      height={1200}
+                      unoptimized
+                      className="mt-3 max-h-96 w-full object-contain"
+                    />
+                  </details>
+                ) : null}
+
+                {ocrStatus ? (
+                  <div className="flex items-start gap-2 rounded-xl border bg-background px-3 py-2 text-sm text-muted-foreground">
+                    <IconSparkles className="mt-0.5 size-4 shrink-0" />
+                    <span>{ocrStatus}</span>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed bg-background p-6 text-center">
@@ -546,6 +1003,17 @@ export default function CreateOrderPage() {
                 className="min-h-24 rounded-xl text-base"
               />
             </div>
+
+            {ocrText ? (
+              <details className="rounded-xl border bg-background px-3 py-2">
+                <summary className="cursor-pointer text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  OCR text
+                </summary>
+                <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">
+                  {ocrText}
+                </pre>
+              </details>
+            ) : null}
           </CardContent>
         </Card>
 
