@@ -33,6 +33,9 @@ import {
 } from "@/lib/db/import-local"
 import { messageOf } from "@/lib/db/shared"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useI18n } from "@/lib/i18n/provider"
+import { LanguageSwitch } from "@/components/language-switch"
+import { RichText } from "@/components/rich-text"
 
 function getInitials(value: string) {
   const words = value.trim().split(/\s+/).filter(Boolean)
@@ -46,6 +49,8 @@ function getInitials(value: string) {
 }
 
 export default function MorePage() {
+  const { t } = useI18n()
+
   const router = useRouter()
 
   const [mounted, setMounted] = useState(false)
@@ -86,25 +91,23 @@ export default function MorePage() {
   async function handleImport() {
     setImporting(true)
     setImportMessage("")
-    setImportProgress("Starting...")
+    setImportProgress(t("Starting..."))
 
     try {
       const result = await importLocalData((done, total) =>
-        setImportProgress(`Imported ${done} of ${total}...`)
+        setImportProgress(t("Imported {done} of {total}...", { done, total }))
       )
 
       if (result.failures.length === 0) {
         setLocalData(null)
-        setImportMessage("Your browser data was imported to your account.")
+        setImportMessage(t("Your browser data was imported to your account."))
       } else {
         setImportMessage(
-          `${result.failures.length} item(s) could not be imported. ${result.failures
-            .slice(0, 3)
-            .join("; ")}. Press Import to try again.`
+          `${t("{count} item(s) could not be imported.", { count: result.failures.length })} ${result.failures.slice(0, 3).join("; ")}. ${t("Press Import to try again.")}`
         )
       }
     } catch (error) {
-      setImportMessage(messageOf(error, "Could not import your browser data."))
+      setImportMessage(messageOf(error, t("Could not import your browser data.")))
     } finally {
       setImporting(false)
       setImportProgress("")
@@ -121,7 +124,7 @@ export default function MorePage() {
     return (
       <main className="min-h-dvh bg-muted px-5 py-5">
         <div className="mx-auto w-full max-w-md">
-          <p className="text-sm text-muted-foreground">Loading settings...</p>
+          <p className="text-sm text-muted-foreground">{t("Loading settings...")}</p>
         </div>
       </main>
     )
@@ -132,10 +135,8 @@ export default function MorePage() {
       <header className="sticky top-0 z-20 border-b bg-background/95 px-5 py-4 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-muted-foreground">Account</p>
-            <h1 className="font-heading text-2xl font-medium tracking-tight">
-              More
-            </h1>
+            <p className="text-sm text-muted-foreground">{t("Account")}</p>
+            <h1 className="font-heading text-2xl font-medium tracking-tight">{t("More")}</h1>
           </div>
         </div>
       </header>
@@ -152,10 +153,10 @@ export default function MorePage() {
 
               <div className="min-w-0">
                 <p className="truncate font-heading text-xl font-medium">
-                  {profile.shopName || "Order Manager"}
+                  {profile.shopName || t("Order Manager")}
                 </p>
                 <p className="mt-1 truncate text-sm text-muted-foreground">
-                  {profile.ownerName || "Owner"}
+                  {profile.ownerName || t("Owner")}
                 </p>
                 {profile.email ? (
                   <p className="mt-1 truncate text-xs text-muted-foreground">
@@ -170,18 +171,11 @@ export default function MorePage() {
         {localData ? (
           <Card className="rounded-[20px] shadow-none">
             <CardHeader>
-              <CardTitle className="text-lg">Import browser data</CardTitle>
+              <CardTitle className="text-lg">{t("Import browser data")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                This browser still holds {localData.orders} order
-                {localData.orders === 1 ? "" : "s"}, {localData.customers} customer
-                {localData.customers === 1 ? "" : "s"}, {localData.shops} shop
-                {localData.shops === 1 ? "" : "s"}, {localData.products} product
-                {localData.products === 1 ? "" : "s"} and {localData.cargo} cargo
-                compan{localData.cargo === 1 ? "y" : "ies"} from before accounts.
-                Import them to keep them in your account. The browser copy is
-                not deleted.
+                {t("This browser still holds {orders} orders, {customers} customers, {shops} shops, {products} products and {cargo} cargo companies from before accounts. Import them to keep them in your account. The browser copy is not deleted.", { orders: localData.orders, customers: localData.customers, shops: localData.shops, products: localData.products, cargo: localData.cargo })}
               </p>
               {importMessage ? (
                 <Alert className="rounded-xl">
@@ -194,7 +188,7 @@ export default function MorePage() {
                 disabled={importing}
                 onClick={handleImport}
               >
-                {importing ? importProgress : "Import to my account"}
+                {importing ? importProgress : t("Import to my account")}
               </Button>
             </CardContent>
           </Card>
@@ -207,20 +201,22 @@ export default function MorePage() {
         <Card className="rounded-[20px] shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <IconSettings className="size-5 text-muted-foreground" />
-              Settings
-            </CardTitle>
+              <IconSettings className="size-5 text-muted-foreground" />{t("Settings")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border bg-background px-3 py-3">
+              <span className="text-sm font-medium">{t("Language")}</span>
+              <LanguageSwitch />
+            </div>
             <SettingsLink
               href="/profile"
-              title="Profile"
-              description="Shop name, owner, phone, and address"
+              title={t("Profile")}
+              description={t("Shop name, owner, phone, and address")}
               icon={<IconUser className="size-5" />}
             />
             <SettingsLink
               href="/cargo"
-              title="Cargo"
+              title={t("Cargo")}
               description={`${cargoCount} saved cargo compan${
                 cargoCount === 1 ? "y" : "ies"
               }`}
@@ -232,20 +228,18 @@ export default function MorePage() {
         <Card className="rounded-[20px] shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <IconLifebuoy className="size-5 text-muted-foreground" />
-              Help
-            </CardTitle>
+              <IconLifebuoy className="size-5 text-muted-foreground" />{t("Help")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <SettingsLink
               href={supportMailto("ticket", profile)}
-              title="Raise a ticket"
-              description="Email support with your account details filled in"
+              title={t("Raise a ticket")}
+              description={t("Email support with your account details filled in")}
               icon={<IconLifebuoy className="size-5" />}
             />
             {profile.plan === "pro" ? null : (
               <p className="text-sm text-muted-foreground">
-                To upgrade to Pro, contact <UpgradeLink account={profile} />.
+                <RichText text={t("To upgrade to Pro, contact {email}.")} parts={{ email: <UpgradeLink account={profile} /> }} />
               </p>
             )}
           </CardContent>
@@ -257,9 +251,7 @@ export default function MorePage() {
           className="h-12 w-full rounded-xl text-destructive hover:text-destructive"
           onClick={handleLogout}
         >
-          <IconLogout className="mr-2 size-5" />
-          Logout
-        </Button>
+          <IconLogout className="mr-2 size-5" />{t("Logout")}</Button>
       </div>
 
       <BottomNavigation active="more" />

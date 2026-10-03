@@ -12,10 +12,14 @@ import { useRouter } from "next/navigation"
 
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
+import { useI18n } from "@/lib/i18n/provider"
+import { LanguageSwitch } from "@/components/language-switch"
 
 
 
 export default function LoginPage() {
+  const { t } = useI18n()
+
   const [showPw, setShowPw] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -27,9 +31,9 @@ export default function LoginPage() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError("")
-    if (!email || !password) { setError("Please enter your email and password."); return }
+    if (!email || !password) { setError(t("Please enter your email and password.")); return }
     if (!isSupabaseConfigured) {
-      setError("Supabase is not set up. See supabase/README.md.")
+      setError(t("Supabase is not set up. See supabase/README.md."))
       return
     }
 
@@ -41,7 +45,7 @@ export default function LoginPage() {
     })
 
     if (signInError) {
-      setError(signInError.message)
+      setError(t(signInError.message))
       setLoading(false)
       return
     }
@@ -53,25 +57,28 @@ export default function LoginPage() {
   return (
     <main className="min-h-dvh bg-muted px-5 py-8 flex flex-col items-center justify-center">
       <div className="w-full max-w-sm flex flex-col items-center">
+        <div className="mb-4 flex w-full justify-end">
+          <LanguageSwitch />
+        </div>
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 size-16 rounded-[20px] bg-primary flex items-center justify-center">
             <IconShoppingBag className="size-8 text-primary-foreground" />
           </div>
-          <h1 className="font-heading text-2xl font-medium tracking-tight">Order Manager</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">Manage orders, payments &amp; deliveries</p>
+          <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Order Manager")}</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">{t("Manage orders, payments & deliveries")}</p>
         </div>
 
         <Card className="w-full rounded-[20px] shadow-none">
           <CardHeader className="px-6 pt-6 pb-0 space-y-1">
-            <CardTitle className="text-xl font-medium">Welcome back</CardTitle>
-            <CardDescription>Enter your account details to continue.</CardDescription>
+            <CardTitle className="text-xl font-medium">{t("Welcome back")}</CardTitle>
+            <CardDescription>{t("Enter your account details to continue.")}</CardDescription>
           </CardHeader>
           <CardContent className="px-6 pb-6 pt-5">
             <form onSubmit={handleLogin} className="space-y-5">
               {error && <Alert variant="destructive" className="rounded-xl"><AlertDescription>{error}</AlertDescription></Alert>}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email address</Label>
+                <Label htmlFor="email">{t("Email address")}</Label>
                 <div className="relative">
                   <Input id="email" type="email" inputMode="email" autoComplete="email"
                     placeholder="you@example.com" value={email}
@@ -81,10 +88,10 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("Password")}</Label>
                 <div className="relative">
                   <Input id="password" type={showPw ? "text" : "password"}
-                    autoComplete="current-password" placeholder="Enter your password" value={password}
+                    autoComplete="current-password" placeholder={t("Enter your password")} value={password}
                     onChange={e => setPassword(e.target.value)}
                     className="h-12 pr-12 rounded-xl text-base" />
                   <button type="button" onClick={() => setShowPw(v => !v)}
@@ -93,16 +100,16 @@ export default function LoginPage() {
                     {showPw ? <IconEyeOff className="size-5" /> : <IconEye className="size-5" />}
                   </button>
                 </div>
-                <p className="text-right"><a href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">Forgot password?</a></p>
+                <p className="text-right"><a href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">{t("Forgot password?")}</a></p>
               </div>
 
               <Button type="submit" className="w-full h-12 rounded-xl text-base" disabled={loading}>
-                {loading ? "Signing in…" : "Login"}
+                {loading ? t("Signing in…") : t("Login")}
               </Button>
               {/* Divider */}
                 <div className="flex items-center gap-3 my-1">
                 <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-muted-foreground">or</span>
+                <span className="text-xs text-muted-foreground">{t("or")}</span>
                 <div className="flex-1 h-px bg-border" />
                 </div>
 
@@ -113,15 +120,13 @@ export default function LoginPage() {
                     className="w-full h-12 rounded-xl text-base gap-2"
                     onClick={() => router.push('/register')}
                     >
-                    <IconUserPlus className="size-5" />
-                    Create an account
-                </Button>
+                    <IconUserPlus className="size-5" />{t("Create an account")}</Button>
             </form>
           </CardContent>
         </Card>
 
         <p className="mt-5 text-center text-xs text-muted-foreground flex items-center gap-1.5">
-          <IconShieldCheck className="size-3.5" /> Secure access for shop owners and staff only
+          <IconShieldCheck className="size-3.5" />{t("Secure access for shop owners and staff only")}
         </p>
       </div>
     </main>

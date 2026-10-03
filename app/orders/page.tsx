@@ -33,6 +33,8 @@ import {
 import { listOrders } from "@/lib/db/orders"
 import { listShops } from "@/lib/db/shops"
 import { messageOf } from "@/lib/db/shared"
+import { useI18n } from "@/lib/i18n/provider"
+import { dateLocale, translate } from "@/lib/i18n/runtime"
 
 const STATUS_VARIANTS: Record<
   OrderStatus,
@@ -51,7 +53,7 @@ function formatDate(value: string) {
 
   if (Number.isNaN(date.getTime())) return "-"
 
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(dateLocale(), {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -71,6 +73,8 @@ function toDateKey(value: string) {
 }
 
 export default function OrdersPage() {
+  const { t } = useI18n()
+
   const [mounted, setMounted] = useState(false)
   const [loadError, setLoadError] = useState("")
   const [orders, setOrders] = useState<LocalOrder[]>([])
@@ -112,7 +116,7 @@ export default function OrdersPage() {
         setOrders(loadedOrders)
         setShopNames([...names.values()].sort((a, b) => a.localeCompare(b)))
       } catch (error) {
-        if (!cancelled) setLoadError(messageOf(error, "Could not load orders."))
+        if (!cancelled) setLoadError(messageOf(error, translate("Could not load orders.")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -192,7 +196,7 @@ export default function OrdersPage() {
     return (
       <main className="min-h-dvh bg-muted px-5 py-5">
         <div className="mx-auto w-full max-w-md">
-          <p className="text-sm text-muted-foreground">Loading orders...</p>
+          <p className="text-sm text-muted-foreground">{t("Loading orders...")}</p>
         </div>
       </main>
     )
@@ -204,15 +208,13 @@ export default function OrdersPage() {
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">
-              {filteredOrders.length} order{filteredOrders.length === 1 ? "" : "s"}
+              {t(filteredOrders.length === 1 ? "{count} order" : "{count} orders", { count: filteredOrders.length })}
             </p>
-            <h1 className="font-heading text-2xl font-medium tracking-tight">
-              Orders
-            </h1>
+            <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Orders")}</h1>
           </div>
 
           <Button asChild size="icon" className="size-11 rounded-xl">
-            <Link href="/orders/create" aria-label="Add order">
+            <Link href="/orders/create" aria-label={t("Add order")}>
               <IconPlus className="size-5" />
             </Link>
           </Button>
@@ -233,36 +235,36 @@ export default function OrdersPage() {
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search order ID, customer, shop, product..."
-                aria-label="Search orders"
+                placeholder={t("Search order ID, customer, shop, product...")}
+                aria-label={t("Search orders")}
                 className="h-12 rounded-xl pl-10 text-base"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <Select value={payment} onValueChange={setPayment}>
-                <SelectTrigger className="h-12 w-full rounded-xl" aria-label="Payment">
-                  <SelectValue placeholder="Payment" />
+                <SelectTrigger className="h-12 w-full rounded-xl" aria-label={t("Payment")}>
+                  <SelectValue placeholder={t("Payment")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All payments</SelectItem>
+                  <SelectItem value="all">{t("All payments")}</SelectItem>
                   {PAYMENT_STATUSES.map((key) => (
                     <SelectItem key={key} value={key}>
-                      {PAYMENT_STATUS_LABELS[key]}
+                      {t(PAYMENT_STATUS_LABELS[key])}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="h-12 w-full rounded-xl" aria-label="Order status">
-                  <SelectValue placeholder="Order status" />
+                <SelectTrigger className="h-12 w-full rounded-xl" aria-label={t("Order status")}>
+                  <SelectValue placeholder={t("Order status")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="all">{t("All statuses")}</SelectItem>
                   {ORDER_STATUSES.map((key) => (
                     <SelectItem key={key} value={key}>
-                      {ORDER_STATUS_LABELS[key]}
+                      {t(ORDER_STATUS_LABELS[key])}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -270,11 +272,11 @@ export default function OrdersPage() {
             </div>
 
             <Select value={shop} onValueChange={setShop}>
-              <SelectTrigger className="h-12 w-full rounded-xl" aria-label="Shop">
-                <SelectValue placeholder="Shop" />
+              <SelectTrigger className="h-12 w-full rounded-xl" aria-label={t("Shop")}>
+                <SelectValue placeholder={t("Shop")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All shops</SelectItem>
+                <SelectItem value="all">{t("All shops")}</SelectItem>
                 {shopNames.map((name) => (
                   <SelectItem key={name} value={name}>
                     {name}
@@ -285,9 +287,7 @@ export default function OrdersPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="orders-date-from" className="text-xs text-muted-foreground">
-                  From
-                </Label>
+                <Label htmlFor="orders-date-from" className="text-xs text-muted-foreground">{t("From")}</Label>
                 <Input
                   id="orders-date-from"
                   type="date"
@@ -299,9 +299,7 @@ export default function OrdersPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="orders-date-to" className="text-xs text-muted-foreground">
-                  To
-                </Label>
+                <Label htmlFor="orders-date-to" className="text-xs text-muted-foreground">{t("To")}</Label>
                 <Input
                   id="orders-date-to"
                   type="date"
@@ -319,9 +317,7 @@ export default function OrdersPage() {
                 variant="outline"
                 className="h-11 w-full rounded-xl"
                 onClick={clearFilters}
-              >
-                Clear filters
-              </Button>
+              >{t("Clear filters")}</Button>
             ) : null}
           </CardContent>
         </Card>
@@ -333,19 +329,13 @@ export default function OrdersPage() {
                 <IconPackage className="size-7 text-muted-foreground" />
               </div>
 
-              <h2 className="mt-4 font-heading text-lg font-medium">
-                No orders found
-              </h2>
+              <h2 className="mt-4 font-heading text-lg font-medium">{t("No orders found")}</h2>
 
-              <p className="mt-2 text-sm text-muted-foreground">
-                Create your first order or clear filters to see existing orders.
-              </p>
+              <p className="mt-2 text-sm text-muted-foreground">{t("Create your first order or clear filters to see existing orders.")}</p>
 
               <Button asChild className="mt-5 h-12 w-full rounded-xl">
                 <Link href="/orders/create">
-                  <IconPlus className="mr-2 size-5" />
-                  Add Order
-                </Link>
+                  <IconPlus className="mr-2 size-5" />{t("Add Order")}</Link>
               </Button>
             </CardContent>
           </Card>
@@ -366,6 +356,8 @@ export default function OrdersPage() {
 }
 
 function OrderRow({ order }: { order: LocalOrder }) {
+  const { t } = useI18n()
+
   return (
     <li>
       <Link
@@ -379,7 +371,7 @@ function OrderRow({ order }: { order: LocalOrder }) {
             </p>
             <p className="mt-1 truncate font-medium">{order.customerName}</p>
             <p className="mt-0.5 truncate text-sm text-muted-foreground">
-              {order.retailerName?.trim() || "No shop"}
+              {order.retailerName?.trim() || t("No shop")}
             </p>
           </div>
 
@@ -393,7 +385,7 @@ function OrderRow({ order }: { order: LocalOrder }) {
               </p>
             ) : null}
             <Badge variant={STATUS_VARIANTS[order.orderStatus]} className="mt-1.5">
-              {ORDER_STATUS_LABELS[order.orderStatus]}
+              {t(ORDER_STATUS_LABELS[order.orderStatus])}
             </Badge>
           </div>
         </div>

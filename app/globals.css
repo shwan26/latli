@@ -128,3 +128,17 @@
     @apply font-sans;
   }
 }
+/* Burmese pages use a font that has Myanmar letters, including for headings. */
+:lang(my) body,
+:lang(my) .font-heading,
+:lang(my) input,
+:lang(my) textarea,
+:lang(my) button,
+:lang(my) select {
+  font-family: var(--font-myanmar), var(--font-sans), sans-serif;
+}
+
+/* Burmese needs more line height than Latin text so the marks do not collide. */
+:lang(my) body {
+  line-height: 1.75;
+}

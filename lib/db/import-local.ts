@@ -5,6 +5,8 @@
 import type { OrderStatus, PaymentStatus } from "@/app/lib/local-orders"
 import { LOCAL_STORAGE_KEYS } from "@/app/lib/local-storage-keys"
 
+import { translate } from "@/lib/i18n/runtime"
+
 import { insertCargo } from "./cargo"
 import { insertCustomer } from "./customers"
 import { insertOrder } from "./orders"
@@ -128,7 +130,7 @@ async function getUserId() {
     data: { user },
   } = await getDb().auth.getUser()
 
-  if (!user) throw new Error("You are signed out. Log in again.")
+  if (!user) throw new Error(translate("You are signed out. Log in again."))
 
   return user.id
 }
@@ -288,7 +290,7 @@ export async function importLocalData(
       await step(`product:${product.id}`, `Product ${product.name ?? ""}`, async () => {
         const shopId = progress.shopIds[shop.id]
 
-        if (!shopId) throw new Error("its shop was not imported")
+        if (!shopId) throw new Error(translate("its shop was not imported"))
 
         await insertProduct(shopId, {
           name: product.name?.trim() || "Product",

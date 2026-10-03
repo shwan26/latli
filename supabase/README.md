@@ -44,7 +44,7 @@ Follow the steps in order. It takes about 10 minutes.
 
 ## 3. Create the tables
 
-Open **SQL Editor > New query**. Run these three files **in this order**, one
+Open **SQL Editor > New query**. Run these four files **in this order**, one
 after the other (paste the whole file, then press Run):
 
 1. `supabase/migrations/20261003000000_profiles.sql`
@@ -61,6 +61,12 @@ after the other (paste the whole file, then press Run):
    it can be pressed again later). Dates are kept in `photo_expiry`, which users
    can read but not change, so nobody can extend their own photos from the
    browser.
+
+4. `supabase/migrations/20261003030000_security_fixes.sql`
+   Security Advisor fixes: stops the internal trigger functions from being
+   callable over the API, and makes "Keep photos for a month" a normal function
+   that follows the security rules instead of bypassing them. Run it even on a
+   project that already has the first three files.
 
 Each file should end with "Success. No rows returned". Run each file only once.
 If one fails halfway, tell me the error message instead of running it again.
@@ -82,6 +88,18 @@ must confirm their email:
 
 - **On**: users get an email link and are sent to `/auth/callback`.
 - **Off**: users are signed in as soon as they register. Easier while testing.
+
+### Security Advisor
+
+After the four files, open **Advisors > Security Advisor** and press **Rerun
+linter**. Everything should be clear except one warning that needs a setting,
+not SQL:
+
+- **Leaked password protection disabled**: turn it on under **Authentication >
+  Sign In / Providers > Email**, option *Prevent use of leaked passwords*. This
+  option is only offered on Supabase's paid plans. On the free plan the warning
+  stays and is safe to leave. While you are there, set **Minimum password
+  length** to 8 to match the registration form.
 
 ## 5. Schedule the photo clean-up
 

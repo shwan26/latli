@@ -49,6 +49,8 @@ import { listOrders, updateOrdersCustomer } from "@/lib/db/orders"
 import { messageOf } from "@/lib/db/shared"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { formatBaht, formatKyat } from "../../lib/currency"
+import { useI18n } from "@/lib/i18n/provider"
+import { dateLocale, translate } from "@/lib/i18n/runtime"
 
 function getInitials(value: string) {
   const words = value.trim().split(/\s+/).filter(Boolean)
@@ -68,7 +70,7 @@ function formatDate(value: string) {
 
   if (Number.isNaN(date.getTime())) return "-"
 
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(dateLocale(), {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -90,6 +92,8 @@ function getStatusVariant(
 }
 
 export default function CustomerDetailsPage() {
+  const { t } = useI18n()
+
   const router = useRouter()
   const params = useParams<{ key: string }>()
   const customerKey = decodeURIComponent(params.key)
@@ -125,7 +129,7 @@ export default function CustomerDetailsPage() {
         setOrders(loadedOrders)
         setSavedCustomers(loadedCustomers)
       } catch (error) {
-        if (!cancelled) setPageError(messageOf(error, "Could not load the customer."))
+        if (!cancelled) setPageError(messageOf(error, translate("Could not load the customer.")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -195,7 +199,7 @@ export default function CustomerDetailsPage() {
           customer.id !== existing?.id && getCustomerKey(customer) === nextKey
       )
     ) {
-      setErrorMessage("Another customer already uses this phone, Facebook or name.")
+      setErrorMessage(t("Another customer already uses this phone, Facebook or name."))
       return
     }
 
@@ -208,7 +212,7 @@ export default function CustomerDetailsPage() {
         ? await updateCustomer(existing.id, input)
         : await insertCustomer(input)
     } catch (error) {
-      setErrorMessage(messageOf(error, "Could not save the customer."))
+      setErrorMessage(messageOf(error, t("Could not save the customer.")))
       setSaving(false)
       return
     }
@@ -227,7 +231,7 @@ export default function CustomerDetailsPage() {
       await updateOrdersCustomer(orderIds, input)
     } catch (error) {
       setErrorMessage(
-        `The customer was saved, but their orders were not updated. ${messageOf(error, "")}`
+        `${t("The customer was saved, but their orders were not updated.")} ${messageOf(error, "")}`
       )
       setSaving(false)
       return
@@ -268,7 +272,7 @@ export default function CustomerDetailsPage() {
     try {
       await deleteCustomer(existing.id)
     } catch (error) {
-      setPageError(messageOf(error, "Could not delete the customer."))
+      setPageError(messageOf(error, t("Could not delete the customer.")))
       return
     }
 
@@ -279,7 +283,7 @@ export default function CustomerDetailsPage() {
     return (
       <main className="min-h-dvh bg-muted px-5 py-5">
         <div className="mx-auto w-full max-w-md">
-          <p className="text-sm text-muted-foreground">Loading customer...</p>
+          <p className="text-sm text-muted-foreground">{t("Loading customer...")}</p>
         </div>
       </main>
     )
@@ -291,18 +295,12 @@ export default function CustomerDetailsPage() {
         <div className="mx-auto w-full max-w-md space-y-4">
           <Button asChild variant="ghost" className="rounded-xl">
             <Link href="/customers">
-              <IconArrowLeft className="mr-2 size-5" />
-              Back to customers
-            </Link>
+              <IconArrowLeft className="mr-2 size-5" />{t("Back to customers")}</Link>
           </Button>
           <Card className="rounded-[20px] shadow-none">
             <CardContent className="p-6 text-center">
-              <h1 className="font-heading text-xl font-medium">
-                Customer not found
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                This customer is not saved and has no orders.
-              </p>
+              <h1 className="font-heading text-xl font-medium">{t("Customer not found")}</h1>
+              <p className="mt-2 text-sm text-muted-foreground">{t("This customer is not saved and has no orders.")}</p>
             </CardContent>
           </Card>
         </div>
@@ -315,13 +313,13 @@ export default function CustomerDetailsPage() {
       <header className="sticky top-0 z-20 border-b bg-background/95 px-5 py-4 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md items-center gap-3">
           <Button asChild variant="ghost" size="icon" className="rounded-xl">
-            <Link href="/customers" aria-label="Back to customers">
+            <Link href="/customers" aria-label={t("Back to customers")}>
               <IconArrowLeft className="size-5" />
             </Link>
           </Button>
 
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-muted-foreground">Customer</p>
+            <p className="text-sm text-muted-foreground">{t("Customer")}</p>
             <h1 className="truncate font-heading text-2xl font-medium tracking-tight">
               {summary.name}
             </h1>
@@ -332,7 +330,7 @@ export default function CustomerDetailsPage() {
             variant="outline"
             size="icon"
             className="rounded-xl"
-            aria-label="Edit customer"
+            aria-label={t("Edit customer")}
             onClick={startEditing}
           >
             <IconPencil className="size-5" />
@@ -344,7 +342,7 @@ export default function CustomerDetailsPage() {
               variant="outline"
               size="icon"
               className="rounded-xl text-destructive hover:text-destructive"
-              aria-label="Delete customer"
+              aria-label={t("Delete customer")}
               onClick={() => setConfirmingDelete(true)}
             >
               <IconTrash className="size-5" />
@@ -374,7 +372,7 @@ export default function CustomerDetailsPage() {
                   {summary.name}
                 </p>
                 <p className="mt-1 truncate text-sm text-muted-foreground">
-                  {summary.facebookName || summary.phone || "No contact saved"}
+                  {summary.facebookName || summary.phone || t("No contact saved")}
                 </p>
               </div>
             </div>
@@ -385,14 +383,14 @@ export default function CustomerDetailsPage() {
 
             {summary.address ? (
               <div className="rounded-2xl bg-muted p-3">
-                <p className="text-[11px] text-muted-foreground">Address</p>
+                <p className="text-[11px] text-muted-foreground">{t("Address")}</p>
                 <p className="mt-1 whitespace-pre-wrap text-sm">{summary.address}</p>
               </div>
             ) : null}
 
             {summary.otherContacts ? (
               <div className="rounded-2xl bg-muted p-3">
-                <p className="text-[11px] text-muted-foreground">Other contacts</p>
+                <p className="text-[11px] text-muted-foreground">{t("Other contacts")}</p>
                 <p className="mt-1 whitespace-pre-wrap text-sm">
                   {summary.otherContacts}
                 </p>
@@ -400,14 +398,14 @@ export default function CustomerDetailsPage() {
             ) : null}
 
             <div className="grid grid-cols-2 gap-3">
-              <AmountBox label="Total" value={formatBaht(summary.totalThb)} />
-              <AmountBox label="MMK" value={formatKyat(summary.totalMmk)} />
+              <AmountBox label={t("Total")} value={formatBaht(summary.totalThb)} />
+              <AmountBox label={t("MMK")} value={formatKyat(summary.totalMmk)} />
               <AmountBox
-                label="Unpaid"
+                label={t("Unpaid")}
                 value={formatBaht(summary.unpaidThb)}
               />
               <AmountBox
-                label="Orders"
+                label={t("Orders")}
                 value={`${customerOrders.length}`}
               />
             </div>
@@ -416,15 +414,13 @@ export default function CustomerDetailsPage() {
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-heading text-lg font-medium">Orders Bought</h2>
+            <h2 className="font-heading text-lg font-medium">{t("Orders Bought")}</h2>
             <Badge variant="secondary">{customerOrders.length}</Badge>
           </div>
 
           {customerOrders.length === 0 ? (
             <Card className="rounded-[20px] shadow-none">
-              <CardContent className="p-5 text-sm text-muted-foreground">
-                No orders yet.
-              </CardContent>
+              <CardContent className="p-5 text-sm text-muted-foreground">{t("No orders yet.")}</CardContent>
             </Card>
           ) : (
             customerOrders.map((order) => (
@@ -438,11 +434,11 @@ export default function CustomerDetailsPage() {
       <Sheet open={editing} onOpenChange={setEditing}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
           <SheetHeader className="border-b">
-            <SheetTitle className="font-heading text-xl">Edit Customer</SheetTitle>
+            <SheetTitle className="font-heading text-xl">{t("Edit Customer")}</SheetTitle>
             <SheetDescription>
               {summary.saved
-                ? "Saving also updates the details on this customer's orders."
-                : "Saving adds this customer to your saved customers and updates the details on their orders."}
+                ? t("Saving also updates the details on this customer's orders.")
+                : t("Saving adds this customer to your saved customers and updates the details on their orders.")}
             </SheetDescription>
           </SheetHeader>
 
@@ -463,11 +459,11 @@ export default function CustomerDetailsPage() {
       <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete {summary.name}?</DialogTitle>
+            <DialogTitle>{t("Delete {name}?", { name: summary.name })}</DialogTitle>
             <DialogDescription>
               {customerOrders.length > 0
-                ? `This removes the saved customer. Their ${customerOrders.length} order${customerOrders.length === 1 ? "" : "s"} stay and the customer still shows in the list because of them.`
-                : "This removes the saved customer."}
+                ? t(customerOrders.length === 1 ? "This removes the saved customer. Their {count} order stays and the customer still shows in the list because of it." : "This removes the saved customer. Their {count} orders stay and the customer still shows in the list because of them.", { count: customerOrders.length })
+                : t("This removes the saved customer.")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -475,12 +471,8 @@ export default function CustomerDetailsPage() {
               type="button"
               variant="outline"
               onClick={() => setConfirmingDelete(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="button" variant="destructive" onClick={handleDelete}>
-              Delete customer
-            </Button>
+            >{t("Cancel")}</Button>
+            <Button type="button" variant="destructive" onClick={handleDelete}>{t("Delete customer")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -491,6 +483,8 @@ export default function CustomerDetailsPage() {
 }
 
 function CustomerOrderRow({ order }: { order: LocalOrder }) {
+  const { t } = useI18n()
+
   return (
     <Link href={`/orders/${order.id}`} className="block">
       <Card className="rounded-[20px] shadow-none transition active:scale-[0.99]">
@@ -501,10 +495,10 @@ function CustomerOrderRow({ order }: { order: LocalOrder }) {
                 {order.orderNumber} · {formatDate(order.createdAt)}
               </p>
               <h3 className="mt-1 truncate font-medium">
-                {order.productName || "Product photo order"}
+                {order.productName || t("Product photo order")}
               </h3>
               <p className="mt-1 truncate text-sm text-muted-foreground">
-                {order.quantity ? `${order.quantity} item${order.quantity === 1 ? "" : "s"}` : "1 item"}
+                {t((order.quantity || 1) === 1 ? "{count} item" : "{count} items", { count: order.quantity || 1 })}
                 {order.productSize || order.productOption
                   ? ` · Size ${order.productSize || order.productOption}`
                   : ""}
@@ -519,22 +513,22 @@ function CustomerOrderRow({ order }: { order: LocalOrder }) {
 
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl border bg-background px-3 py-2">
-              <p className="text-[11px] text-muted-foreground">Payment</p>
+              <p className="text-[11px] text-muted-foreground">{t("Payment")}</p>
               <Badge
                 variant={getStatusVariant(order.paymentStatus)}
                 className="mt-1"
               >
-                {PAYMENT_STATUS_LABELS[order.paymentStatus]}
+                {t(PAYMENT_STATUS_LABELS[order.paymentStatus])}
               </Badge>
             </div>
 
             <div className="rounded-xl border bg-background px-3 py-2">
-              <p className="text-[11px] text-muted-foreground">Order status</p>
+              <p className="text-[11px] text-muted-foreground">{t("Order status")}</p>
               <Badge
                 variant={getStatusVariant(order.orderStatus)}
                 className="mt-1"
               >
-                {ORDER_STATUS_LABELS[order.orderStatus]}
+                {t(ORDER_STATUS_LABELS[order.orderStatus])}
               </Badge>
             </div>
           </div>

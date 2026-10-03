@@ -70,6 +70,9 @@ import {
   listShops,
   updateShop,
 } from "@/lib/db/shops"
+import { useI18n } from "@/lib/i18n/provider"
+import { dateLocale, translate } from "@/lib/i18n/runtime"
+import { RichText } from "@/components/rich-text"
 
 type ShopDraft = typeof emptyShopDraft
 
@@ -101,6 +104,8 @@ function formatBaht(value: number) {
 }
 
 export default function ShopsPage() {
+  const { t } = useI18n()
+
   const [mounted, setMounted] = useState(false)
   const [shops, setShops] = useState<LocalShop[]>([])
   const [shopDraft, setShopDraft] = useState<ShopDraft>(emptyShopDraft)
@@ -147,7 +152,7 @@ export default function ShopsPage() {
         setIsPro(profile?.plan === "pro")
         setAccount(profile)
       } catch (error) {
-        if (!cancelled) setErrorMessage(messageOf(error, "Could not load shops."))
+        if (!cancelled) setErrorMessage(messageOf(error, translate("Could not load shops.")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -195,7 +200,7 @@ export default function ShopsPage() {
       return true
     } catch (error) {
       setSavedMessage("")
-      setErrorMessage(messageOf(error, "Could not save."))
+      setErrorMessage(messageOf(error, t("Could not save.")))
       return false
     } finally {
       setBusy(false)
@@ -217,7 +222,7 @@ export default function ShopsPage() {
       })
 
       setShops((current) => [...current, shop])
-    }, "Shop added.")
+    }, t("Shop added."))
 
     if (saved) {
       setShopDraft(emptyShopDraft)
@@ -272,7 +277,7 @@ export default function ShopsPage() {
           shop.id === selectedShop.id ? { ...shop, ...input } : shop
         )
       )
-    }, "Shop updated.")
+    }, t("Shop updated."))
 
     if (saved) setEditing(false)
   }
@@ -284,7 +289,7 @@ export default function ShopsPage() {
       await deleteShop(selectedShop)
 
       setShops((current) => current.filter((shop) => shop.id !== selectedShop.id))
-    }, "Shop deleted.")
+    }, t("Shop deleted."))
 
     if (saved) closeShop()
   }
@@ -330,7 +335,7 @@ export default function ShopsPage() {
             : shop
         )
       )
-    }, "Product added.")
+    }, t("Product added."))
 
     if (saved) setProductDraft(emptyProductDraft)
   }
@@ -352,7 +357,7 @@ export default function ShopsPage() {
 
         return next
       })
-    }, "Photos will be kept for a month.")
+    }, t("Photos will be kept for a month."))
   }
 
   async function handleRemoveProduct(product: LocalShopProduct) {
@@ -371,14 +376,14 @@ export default function ShopsPage() {
             : shop
         )
       )
-    }, "Product removed.")
+    }, t("Product removed."))
   }
 
   if (!mounted) {
     return (
       <main className="min-h-dvh bg-muted px-5 py-5">
         <div className="mx-auto w-full max-w-md">
-          <p className="text-sm text-muted-foreground">Loading shops...</p>
+          <p className="text-sm text-muted-foreground">{t("Loading shops...")}</p>
         </div>
       </main>
     )
@@ -390,18 +395,16 @@ export default function ShopsPage() {
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">
-              {shops.length} shop{shops.length === 1 ? "" : "s"}
+              {t(shops.length === 1 ? "{count} shop" : "{count} shops", { count: shops.length })}
             </p>
-            <h1 className="font-heading text-2xl font-medium tracking-tight">
-              Shops
-            </h1>
+            <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Shops")}</h1>
           </div>
 
           <Button
             type="button"
             size="icon"
             className="size-11 rounded-xl"
-            aria-label="Add shop"
+            aria-label={t("Add shop")}
             onClick={openAddShop}
           >
             <IconPlus className="size-5" />
@@ -430,8 +433,8 @@ export default function ShopsPage() {
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search shop, location, product"
-                  aria-label="Search shops"
+                  placeholder={t("Search shop, location, product")}
+                  aria-label={t("Search shops")}
                   className="h-12 rounded-xl pl-10 text-base"
                 />
               </div>
@@ -440,12 +443,12 @@ export default function ShopsPage() {
                 value={sort}
                 onValueChange={(value) => setSort(value as "name" | "newest")}
               >
-                <SelectTrigger className="h-12 rounded-xl" aria-label="Sort shops">
+                <SelectTrigger className="h-12 rounded-xl" aria-label={t("Sort shops")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="name">A to Z</SelectItem>
-                  <SelectItem value="newest">Latest created</SelectItem>
+                  <SelectItem value="name">{t("A to Z")}</SelectItem>
+                  <SelectItem value="newest">{t("Latest created")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -453,15 +456,11 @@ export default function ShopsPage() {
 
           {shops.length === 0 ? (
             <Card className="rounded-[20px] shadow-none">
-              <CardContent className="p-5 text-sm text-muted-foreground">
-                No shops saved yet.
-              </CardContent>
+              <CardContent className="p-5 text-sm text-muted-foreground">{t("No shops saved yet.")}</CardContent>
             </Card>
           ) : visibleShops.length === 0 ? (
             <Card className="rounded-[20px] shadow-none">
-              <CardContent className="p-5 text-sm text-muted-foreground">
-                No shops match your search.
-              </CardContent>
+              <CardContent className="p-5 text-sm text-muted-foreground">{t("No shops match your search.")}</CardContent>
             </Card>
           ) : (
             <Card className="overflow-hidden rounded-[20px] shadow-none">
@@ -477,12 +476,11 @@ export default function ShopsPage() {
                         <div className="min-w-0">
                           <p className="truncate font-medium">{shop.name}</p>
                           <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                            {shop.location || "No location"}
+                            {shop.location || t("No location")}
                           </p>
                         </div>
                         <Badge variant="outline" className="shrink-0">
-                          {shop.products.length} product
-                          {shop.products.length === 1 ? "" : "s"}
+                          {t(shop.products.length === 1 ? "{count} product" : "{count} products", { count: shop.products.length })}
                         </Badge>
                       </div>
                     </button>
@@ -497,10 +495,8 @@ export default function ShopsPage() {
       <Sheet open={adding} onOpenChange={setAdding}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
           <SheetHeader className="border-b">
-            <SheetTitle className="font-heading text-xl">Add Shop</SheetTitle>
-            <SheetDescription>
-              Products can be added after the shop is saved.
-            </SheetDescription>
+            <SheetTitle className="font-heading text-xl">{t("Add Shop")}</SheetTitle>
+            <SheetDescription>{t("Products can be added after the shop is saved.")}</SheetDescription>
           </SheetHeader>
 
           <div className="space-y-4 p-4">
@@ -513,53 +509,53 @@ export default function ShopsPage() {
             <form onSubmit={handleAddShop} className="space-y-4">
               <TextInput
                 id="shopName"
-                label="Shop name"
+                label={t("Shop name")}
                 value={shopDraft.name}
                 onChange={(value) => updateShopDraft("name", value)}
-                placeholder="Bangkok shop"
+                placeholder={t("Bangkok shop")}
                 required
               />
               <TextInput
                 id="shopOwner"
-                label="Contact name (optional)"
+                label={t("Contact name (optional)")}
                 value={shopDraft.ownerName}
                 onChange={(value) => updateShopDraft("ownerName", value)}
-                placeholder="Contact name"
+                placeholder={t("Contact name")}
               />
               <TextInput
                 id="shopPhone"
-                label="Phone or LINE"
+                label={t("Phone or LINE")}
                 value={shopDraft.phone}
                 onChange={(value) => updateShopDraft("phone", value)}
-                placeholder="Phone number or LINE ID"
+                placeholder={t("Phone number or LINE ID")}
                 required
               />
               <div className="space-y-2">
-                <Label htmlFor="shopLocation">Location</Label>
+                <Label htmlFor="shopLocation">{t("Location")}</Label>
                 <Textarea
                   id="shopLocation"
                   value={shopDraft.location}
                   onChange={(event) =>
                     updateShopDraft("location", event.target.value)
                   }
-                  placeholder="Shop address, mall, market, or pickup location"
+                  placeholder={t("Shop address, mall, market, or pickup location")}
                   required
                   className="min-h-24 rounded-xl text-base"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="shopNote">Shop info (optional)</Label>
+                <Label htmlFor="shopNote">{t("Shop info (optional)")}</Label>
                 <Textarea
                   id="shopNote"
                   value={shopDraft.note}
                   onChange={(event) => updateShopDraft("note", event.target.value)}
-                  placeholder="Opening hours, buying notes, payment terms"
+                  placeholder={t("Opening hours, buying notes, payment terms")}
                   className="min-h-24 rounded-xl text-base"
                 />
               </div>
               <Button type="submit" className="h-12 w-full rounded-xl" disabled={busy}>
                 <IconPlus className="mr-2 size-5" />
-                {busy ? "Saving..." : "Add Shop"}
+                {busy ? t("Saving...") : t("Add Shop")}
               </Button>
             </form>
           </div>
@@ -610,11 +606,14 @@ export default function ShopsPage() {
       <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete {selectedShop?.name}?</DialogTitle>
+            <DialogTitle>{t("Delete {name}?", { name: selectedShop?.name ?? "" })}</DialogTitle>
             <DialogDescription>
-              This removes the shop and its {selectedShop?.products.length ?? 0}{" "}
-              product{selectedShop?.products.length === 1 ? "" : "s"}. Existing
-              orders keep the shop name.
+              {t(
+                selectedShop?.products.length === 1
+                  ? "This removes the shop and its {count} product. Existing orders keep the shop name."
+                  : "This removes the shop and its {count} products. Existing orders keep the shop name.",
+                { count: selectedShop?.products.length ?? 0 }
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -622,9 +621,7 @@ export default function ShopsPage() {
               type="button"
               variant="outline"
               onClick={() => setConfirmingDelete(false)}
-            >
-              Cancel
-            </Button>
+            >{t("Cancel")}</Button>
             <Button
               type="button"
               variant="destructive"
@@ -632,9 +629,7 @@ export default function ShopsPage() {
                 setConfirmingDelete(false)
                 handleDeleteShop()
               }}
-            >
-              Delete shop
-            </Button>
+            >{t("Delete shop")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -687,6 +682,8 @@ function ShopDetail({
   onAddProduct: (event: FormEvent<HTMLFormElement>) => void
   onRemoveProduct: (product: LocalShopProduct) => void
 }) {
+  const { t } = useI18n()
+
   return (
     <>
       <SheetHeader className="border-b">
@@ -694,7 +691,7 @@ function ShopDetail({
           {shop.name}
         </SheetTitle>
         <SheetDescription>
-          {shop.products.length} product{shop.products.length === 1 ? "" : "s"}
+          {t(shop.products.length === 1 ? "{count} product" : "{count} products", { count: shop.products.length })}
         </SheetDescription>
       </SheetHeader>
 
@@ -715,26 +712,26 @@ function ShopDetail({
           <form onSubmit={onSaveEdit} className="space-y-4">
             <TextInput
               id="editShopName"
-              label="Shop name"
+              label={t("Shop name")}
               value={editDraft.name}
               onChange={(value) => onEditChange("name", value)}
               required
             />
             <TextInput
               id="editShopOwner"
-              label="Contact name (optional)"
+              label={t("Contact name (optional)")}
               value={editDraft.ownerName}
               onChange={(value) => onEditChange("ownerName", value)}
             />
             <TextInput
               id="editShopPhone"
-              label="Phone or LINE"
+              label={t("Phone or LINE")}
               value={editDraft.phone}
               onChange={(value) => onEditChange("phone", value)}
               required
             />
             <div className="space-y-2">
-              <Label htmlFor="editShopLocation">Location</Label>
+              <Label htmlFor="editShopLocation">{t("Location")}</Label>
               <Textarea
                 id="editShopLocation"
                 value={editDraft.location}
@@ -744,7 +741,7 @@ function ShopDetail({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editShopNote">Shop info (optional)</Label>
+              <Label htmlFor="editShopNote">{t("Shop info (optional)")}</Label>
               <Textarea
                 id="editShopNote"
                 value={editDraft.note}
@@ -758,11 +755,9 @@ function ShopDetail({
                 variant="outline"
                 className="h-11 rounded-xl"
                 onClick={onCancelEdit}
-              >
-                Cancel
-              </Button>
+              >{t("Cancel")}</Button>
               <Button type="submit" className="h-11 rounded-xl" disabled={busy}>
-                {busy ? "Saving..." : "Save"}
+                {busy ? t("Saving...") : t("Save")}
               </Button>
             </div>
           </form>
@@ -796,18 +791,14 @@ function ShopDetail({
                 className="h-11 rounded-xl"
                 onClick={onStartEdit}
               >
-                <IconPencil className="mr-2 size-4" />
-                Edit
-              </Button>
+                <IconPencil className="mr-2 size-4" />{t("Edit")}</Button>
               <Button
                 type="button"
                 variant="outline"
                 className="h-11 rounded-xl text-destructive hover:text-destructive"
                 onClick={onDelete}
               >
-                <IconTrash className="mr-2 size-4" />
-                Delete
-              </Button>
+                <IconTrash className="mr-2 size-4" />{t("Delete")}</Button>
             </div>
           </div>
         )}
@@ -815,13 +806,13 @@ function ShopDetail({
         {shop.products.some((product) => product.imagePath) ? (
           <div className="space-y-2 rounded-2xl border p-3">
             <p className="text-sm text-muted-foreground">
-              Product photos are deleted 7 days after they are saved.
-              {isPro ? null : (
-                <>
-                  {" "}
-                  Pro accounts can keep them for a month. To upgrade, contact{" "}
-                  <UpgradeLink account={account ?? undefined} />.
-                </>
+              {isPro ? (
+                t("Product photos are deleted 7 days after they are saved.")
+              ) : (
+                <RichText
+                  text={t("Product photos are deleted 7 days after they are saved. Pro accounts can keep them for a month. To upgrade, contact {email}.")}
+                  parts={{ email: <UpgradeLink account={account ?? undefined} /> }}
+                />
               )}
             </p>
             {isPro ? (
@@ -832,7 +823,7 @@ function ShopDetail({
                 disabled={busy}
                 onClick={onKeepPhotos}
               >
-                {busy ? "Saving..." : "Keep photos for a month"}
+                {busy ? t("Saving...") : t("Keep photos for a month")}
               </Button>
             ) : null}
           </div>
@@ -868,11 +859,12 @@ function ShopDetail({
                   </p>
                   {product.imagePath && photoExpiry[product.imagePath] ? (
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      Photo kept until{" "}
-                      {new Date(photoExpiry[product.imagePath]).toLocaleDateString(
-                        "en-US",
-                        { month: "short", day: "numeric" }
-                      )}
+                      {t("Photo kept until {date}", {
+                        date: new Date(photoExpiry[product.imagePath]).toLocaleDateString(
+                          dateLocale(),
+                          { month: "short", day: "numeric" }
+                        ),
+                      })}
                     </p>
                   ) : null}
                 </div>
@@ -893,15 +885,13 @@ function ShopDetail({
 
         <form onSubmit={onAddProduct} className="space-y-3 rounded-2xl border p-3">
           <div className="flex items-center gap-2 text-sm font-medium">
-            <IconPackage className="size-4 text-muted-foreground" />
-            Add Product
-          </div>
+            <IconPackage className="size-4 text-muted-foreground" />{t("Add Product")}</div>
           <TextInput
             id="productName"
-            label="Product name"
+            label={t("Product name")}
             value={productDraft.name}
             onChange={(value) => onProductChange("name", value)}
-            placeholder="Dress, shoes, bag"
+            placeholder={t("Dress, shoes, bag")}
             required
           />
           <ProductImageInput
@@ -911,25 +901,25 @@ function ShopDetail({
           />
           <TextInput
             id="productPrice"
-            label="Price THB"
+            label={t("Price THB")}
             value={productDraft.priceThb}
             onChange={(value) => onProductChange("priceThb", value)}
             placeholder="0"
             type="number"
           />
           <div className="space-y-2">
-            <Label htmlFor="productNote">Variants (color, size)</Label>
+            <Label htmlFor="productNote">{t("Variants (color, size)")}</Label>
             <Textarea
               id="productNote"
               value={productDraft.note}
               onChange={(event) => onProductChange("note", event.target.value)}
-              placeholder="Black, White / S, M, L"
+              placeholder={t("Black, White / S, M, L")}
               className="min-h-20 rounded-xl text-base"
             />
           </div>
           <Button type="submit" variant="outline" className="h-11 w-full rounded-xl" disabled={busy}>
             <IconPlus className="mr-2 size-5" />
-            {busy ? "Saving..." : "Add Product"}
+            {busy ? t("Saving...") : t("Add Product")}
           </Button>
         </form>
       </div>
@@ -980,6 +970,8 @@ function ProductImageInput({
   value: string
   onChange: (value: string) => void
 }) {
+  const { t } = useI18n()
+
   const [error, setError] = useState("")
 
   async function handleFile(file: File | undefined) {
@@ -990,19 +982,19 @@ function ProductImageInput({
     try {
       onChange(await resizeImageToDataUrl(file))
     } catch {
-      setError("Could not read this image. Try a JPG or PNG photo.")
+      setError(t("Could not read this image. Try a JPG or PNG photo."))
     }
   }
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>Product photo</Label>
+      <Label htmlFor={id}>{t("Product photo")}</Label>
 
       {value ? (
         <div className="relative w-fit">
           <Image
             src={value}
-            alt="Product preview"
+            alt={t("Product preview")}
             width={112}
             height={112}
             unoptimized
@@ -1013,7 +1005,7 @@ function ProductImageInput({
             variant="secondary"
             size="icon"
             className="absolute -right-2 -top-2 size-7 rounded-full"
-            aria-label="Remove photo"
+            aria-label={t("Remove photo")}
             onClick={() => onChange("")}
           >
             <IconX className="size-4" />
@@ -1032,9 +1024,7 @@ function ProductImageInput({
         className="h-12 rounded-xl text-base"
       />
 
-      <p className="text-xs text-muted-foreground">
-        Photos are deleted 7 days after they are saved.
-      </p>
+      <p className="text-xs text-muted-foreground">{t("Photos are deleted 7 days after they are saved.")}</p>
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>

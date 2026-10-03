@@ -33,8 +33,13 @@ import {
 } from "@/components/ui/select"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
+import { useI18n } from "@/lib/i18n/provider"
+import { LanguageSwitch } from "@/components/language-switch"
+import { RichText } from "@/components/rich-text"
 
 export default function CreateAccountPage() {
+  const { t } = useI18n()
+
   const router = useRouter()
 
   const [showPassword, setShowPassword] = useState(false)
@@ -65,34 +70,34 @@ export default function CreateAccountPage() {
       !password ||
       !confirmPassword
     ) {
-      setError("Please fill in all required fields.")
+      setError(t("Please fill in all required fields."))
       return
     }
 
     const ageNumber = Number(age)
 
     if (!Number.isInteger(ageNumber) || ageNumber < 13 || ageNumber > 120) {
-      setError("Enter a valid age between 13 and 120.")
+      setError(t("Enter a valid age between 13 and 120."))
       return
     }
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.")
+      setError(t("Password must be at least 8 characters."))
       return
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.")
+      setError(t("Passwords do not match."))
       return
     }
 
     if (!agreed) {
-      setError("Please agree to the Terms of Service and Privacy Policy.")
+      setError(t("Please agree to the Terms of Service and Privacy Policy."))
       return
     }
 
     if (!isSupabaseConfigured) {
-      setError("Supabase is not set up. See supabase/README.md.")
+      setError(t("Supabase is not set up. See supabase/README.md."))
       return
     }
 
@@ -115,7 +120,7 @@ export default function CreateAccountPage() {
     })
 
     if (signUpError) {
-      setError(signUpError.message)
+      setError(t(signUpError.message))
       setLoading(false)
       return
     }
@@ -134,28 +139,23 @@ export default function CreateAccountPage() {
   return (
     <main className="min-h-dvh bg-muted px-5 py-8 flex flex-col items-center justify-center">
       <div className="w-full max-w-sm flex flex-col items-center">
+        <div className="mb-4 flex w-full justify-end">
+          <LanguageSwitch />
+        </div>
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 size-16 rounded-[20px] bg-primary flex items-center justify-center">
             <IconShoppingBag className="size-8 text-primary-foreground" />
           </div>
 
-          <h1 className="font-heading text-2xl font-medium tracking-tight">
-            Create account
-          </h1>
+          <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Create account")}</h1>
 
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Set up your shop to manage orders and deliveries.
-          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">{t("Set up your shop to manage orders and deliveries.")}</p>
         </div>
 
         <Card className="w-full rounded-[20px] shadow-none">
           <CardHeader className="px-6 pt-6 pb-0 space-y-1">
-            <CardTitle className="text-xl font-medium">
-              Register your shop
-            </CardTitle>
-            <CardDescription>
-              Enter your details to create an owner account.
-            </CardDescription>
+            <CardTitle className="text-xl font-medium">{t("Register your shop")}</CardTitle>
+            <CardDescription>{t("Enter your details to create an owner account.")}</CardDescription>
           </CardHeader>
 
           <CardContent className="px-6 pb-6 pt-5">
@@ -163,12 +163,11 @@ export default function CreateAccountPage() {
               <div className="space-y-5">
                 <Alert className="rounded-xl">
                   <AlertDescription>
-                    We sent a confirmation link to {email.trim()}. Open it to
-                    activate your account, then log in.
+                    {t("We sent a confirmation link to {email}. Open it to activate your account, then log in.", { email: email.trim() })}
                   </AlertDescription>
                 </Alert>
                 <Button asChild className="w-full h-12 rounded-xl text-base">
-                  <Link href="/login">Go to login</Link>
+                  <Link href="/login">{t("Go to login")}</Link>
                 </Button>
               </div>
             ) : (
@@ -180,14 +179,14 @@ export default function CreateAccountPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="shopName">Shop name</Label>
+                <Label htmlFor="shopName">{t("Shop name")}</Label>
 
                 <div className="relative">
                   <Input
                     id="shopName"
                     type="text"
                     autoComplete="organization"
-                    placeholder="Your shop name"
+                    placeholder={t("Your shop name")}
                     value={shopName}
                     onChange={(event) => setShopName(event.target.value)}
                     className="h-12 rounded-xl text-base"
@@ -196,14 +195,14 @@ export default function CreateAccountPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ownerName">Owner name</Label>
+                <Label htmlFor="ownerName">{t("Owner name")}</Label>
 
                 <div className="relative">
                   <Input
                     id="ownerName"
                     type="text"
                     autoComplete="name"
-                    placeholder="Your name"
+                    placeholder={t("Your name")}
                     value={ownerName}
                     onChange={(event) => setOwnerName(event.target.value)}
                     className="h-12 rounded-xl text-base"
@@ -213,14 +212,14 @@ export default function CreateAccountPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="age">Age</Label>
+                  <Label htmlFor="age">{t("Age")}</Label>
                   <Input
                     id="age"
                     type="number"
                     inputMode="numeric"
                     min="13"
                     max="120"
-                    placeholder="Age"
+                    placeholder={t("Age")}
                     value={age}
                     onChange={(event) => setAge(event.target.value)}
                     className="h-12 rounded-xl text-base"
@@ -228,7 +227,7 @@ export default function CreateAccountPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="gender">Gender (optional)</Label>
+                  <Label htmlFor="gender">{t("Gender (optional)")}</Label>
                   <Select
                     value={gender || "unset"}
                     onValueChange={(value) =>
@@ -239,20 +238,18 @@ export default function CreateAccountPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="unset">Not set</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                      <SelectItem value="prefer_not_to_say">
-                        Prefer not to say
-                      </SelectItem>
+                      <SelectItem value="unset">{t("Not set")}</SelectItem>
+                      <SelectItem value="female">{t("Female")}</SelectItem>
+                      <SelectItem value="male">{t("Male")}</SelectItem>
+                      <SelectItem value="other">{t("Other")}</SelectItem>
+                      <SelectItem value="prefer_not_to_say">{t("Prefer not to say")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email address</Label>
+                <Label htmlFor="email">{t("Email address")}</Label>
 
                 <div className="relative">
                   <Input
@@ -269,14 +266,14 @@ export default function CreateAccountPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("Password")}</Label>
 
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    placeholder="Create a password"
+                    placeholder={t("Create a password")}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     className="h-12 pr-12 rounded-xl text-base"
@@ -296,20 +293,18 @@ export default function CreateAccountPage() {
                   </button>
                 </div>
 
-                <p className="text-xs text-muted-foreground">
-                  Use at least 8 characters.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("Use at least 8 characters.")}</p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm password</Label>
+                <Label htmlFor="confirmPassword">{t("Confirm password")}</Label>
 
                 <div className="relative">
                   <Input
                     id="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    placeholder="Confirm your password"
+                    placeholder={t("Confirm your password")}
                     value={confirmPassword}
                     onChange={(event) =>
                       setConfirmPassword(event.target.value)
@@ -347,15 +342,21 @@ export default function CreateAccountPage() {
                   htmlFor="terms"
                   className="text-sm font-normal leading-snug text-muted-foreground"
                 >
-                  I agree to the{" "}
-                  <Link href="/terms" className="font-medium text-foreground underline" target="_blank">
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="/privacy" className="font-medium text-foreground underline" target="_blank">
-                    Privacy Policy
-                  </Link>
-                  .
+                  <RichText
+                    text={t("I agree to the {terms} and {privacy}.")}
+                    parts={{
+                      terms: (
+                        <Link href="/terms" className="font-medium text-foreground underline" target="_blank">
+                          {t("Terms of Service")}
+                        </Link>
+                      ),
+                      privacy: (
+                        <Link href="/privacy" className="font-medium text-foreground underline" target="_blank">
+                          {t("Privacy Policy")}
+                        </Link>
+                      ),
+                    }}
+                  />
                 </Label>
               </div>
 
@@ -365,7 +366,7 @@ export default function CreateAccountPage() {
                   className="w-full h-12 rounded-xl text-base"
                   disabled={loading}
                 >
-                  {loading ? "Creating account…" : "Create account"}
+                  {loading ? t("Creating account…") : t("Create account")}
                 </Button>
 
                 <Button
@@ -374,7 +375,7 @@ export default function CreateAccountPage() {
                   variant="outline"
                   className="w-full h-12 rounded-xl text-base"
                 >
-                  <Link href="/login">Back to login</Link>
+                  <Link href="/login">{t("Back to login")}</Link>
                 </Button>
               </div>
             </form>
@@ -383,9 +384,7 @@ export default function CreateAccountPage() {
         </Card>
 
         <p className="mt-5 text-center text-xs text-muted-foreground flex items-center gap-1.5">
-          <IconShieldCheck className="size-3.5" />
-          Owner account for shop order management
-        </p>
+          <IconShieldCheck className="size-3.5" />{t("Owner account for shop order management")}</p>
       </div>
     </main>
   )

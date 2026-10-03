@@ -15,10 +15,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { emptyCargoDraft, type LocalCargoCompany } from "../lib/local-shops"
 import { insertCargo, listCargo } from "@/lib/db/cargo"
 import { messageOf } from "@/lib/db/shared"
+import { useI18n } from "@/lib/i18n/provider"
+import { translate } from "@/lib/i18n/runtime"
 
 type CargoDraft = typeof emptyCargoDraft
 
 export default function CargoPage() {
+  const { t } = useI18n()
+
   const [mounted, setMounted] = useState(false)
   const [companies, setCompanies] = useState<LocalCargoCompany[]>([])
   const [draft, setDraft] = useState<CargoDraft>(emptyCargoDraft)
@@ -35,7 +39,7 @@ export default function CargoPage() {
 
         if (!cancelled) setCompanies(loaded)
       } catch (loadError) {
-        if (!cancelled) setError(messageOf(loadError, "Could not load cargo."))
+        if (!cancelled) setError(messageOf(loadError, translate("Could not load cargo.")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -65,7 +69,7 @@ export default function CargoPage() {
       setDraft(emptyCargoDraft)
       setSaved(true)
     } catch (saveError) {
-      setError(messageOf(saveError, "Could not save the cargo company."))
+      setError(messageOf(saveError, t("Could not save the cargo company.")))
     } finally {
       setSaving(false)
     }
@@ -75,7 +79,7 @@ export default function CargoPage() {
     return (
       <main className="min-h-dvh bg-muted px-5 py-5">
         <div className="mx-auto w-full max-w-md">
-          <p className="text-sm text-muted-foreground">Loading cargo...</p>
+          <p className="text-sm text-muted-foreground">{t("Loading cargo...")}</p>
         </div>
       </main>
     )
@@ -86,15 +90,13 @@ export default function CargoPage() {
       <header className="sticky top-0 z-20 border-b bg-background/95 px-5 py-4 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md items-center gap-3">
           <Button asChild variant="ghost" size="icon" className="rounded-xl">
-            <Link href="/more" aria-label="Back to more">
+            <Link href="/more" aria-label={t("Back to more")}>
               <IconArrowLeft className="size-5" />
             </Link>
           </Button>
           <div>
-            <p className="text-sm text-muted-foreground">Delivery partners</p>
-            <h1 className="font-heading text-2xl font-medium tracking-tight">
-              Cargo
-            </h1>
+            <p className="text-sm text-muted-foreground">{t("Delivery partners")}</p>
+            <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Cargo")}</h1>
           </div>
         </div>
       </header>
@@ -108,59 +110,57 @@ export default function CargoPage() {
 
         {saved ? (
           <Alert className="rounded-xl">
-            <AlertDescription>Cargo company saved.</AlertDescription>
+            <AlertDescription>{t("Cargo company saved.")}</AlertDescription>
           </Alert>
         ) : null}
 
         <Card className="rounded-[20px] shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <IconTruckDelivery className="size-5 text-muted-foreground" />
-              Add Cargo
-            </CardTitle>
+              <IconTruckDelivery className="size-5 text-muted-foreground" />{t("Add Cargo")}</CardTitle>
           </CardHeader>
 
           <CardContent>
             <form onSubmit={handleAddCargo} className="space-y-4">
               <TextInput
                 id="cargoName"
-                label="Cargo name"
+                label={t("Cargo name")}
                 value={draft.name}
                 onChange={(value) => updateDraft("name", value)}
-                placeholder="Cargo company"
+                placeholder={t("Cargo company")}
                 required
               />
               <TextInput
                 id="cargoPhone"
-                label="Phone"
+                label={t("Phone")}
                 value={draft.phone}
                 onChange={(value) => updateDraft("phone", value)}
-                placeholder="Phone number"
+                placeholder={t("Phone number")}
                 type="tel"
               />
               <div className="space-y-2">
-                <Label htmlFor="cargoLocation">Location</Label>
+                <Label htmlFor="cargoLocation">{t("Location")}</Label>
                 <Textarea
                   id="cargoLocation"
                   value={draft.location}
                   onChange={(event) => updateDraft("location", event.target.value)}
-                  placeholder="Cargo office or drop-off address"
+                  placeholder={t("Cargo office or drop-off address")}
                   className="min-h-24 rounded-xl text-base"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cargoNote">Note</Label>
+                <Label htmlFor="cargoNote">{t("Note")}</Label>
                 <Textarea
                   id="cargoNote"
                   value={draft.note}
                   onChange={(event) => updateDraft("note", event.target.value)}
-                  placeholder="Fees, cutoff times, or delivery note"
+                  placeholder={t("Fees, cutoff times, or delivery note")}
                   className="min-h-24 rounded-xl text-base"
                 />
               </div>
               <Button type="submit" className="h-12 w-full rounded-xl" disabled={saving}>
                 <IconPlus className="mr-2 size-5" />
-                {saving ? "Saving..." : "Add Cargo"}
+                {saving ? t("Saving...") : t("Add Cargo")}
               </Button>
             </form>
           </CardContent>
@@ -168,15 +168,13 @@ export default function CargoPage() {
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-heading text-lg font-medium">Saved Cargo</h2>
+            <h2 className="font-heading text-lg font-medium">{t("Saved Cargo")}</h2>
             <Badge variant="secondary">{companies.length}</Badge>
           </div>
 
           {companies.length === 0 ? (
             <Card className="rounded-[20px] shadow-none">
-              <CardContent className="p-5 text-sm text-muted-foreground">
-                No cargo companies saved yet.
-              </CardContent>
+              <CardContent className="p-5 text-sm text-muted-foreground">{t("No cargo companies saved yet.")}</CardContent>
             </Card>
           ) : (
             companies.map((company) => (

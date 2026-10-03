@@ -1,5 +1,7 @@
 import Link from "next/link"
 
+import { translateTo } from "@/lib/i18n/runtime"
+
 // One block of text is a paragraph. An array of strings is a bullet list.
 export type LegalBlock = string | string[]
 
@@ -21,6 +23,10 @@ export function LegalPage({
   sections: LegalSection[]
   otherPage: { href: string; label: string }
 }) {
+  // Legal text is English only for now.
+  const t = (text: string, vars?: Record<string, string | number>) =>
+    translateTo("en", text, vars)
+
   return (
     <main className="min-h-dvh bg-muted px-5 py-8">
       <article className="mx-auto w-full max-w-2xl space-y-8 rounded-[20px] border bg-background p-6 md:p-8">
@@ -28,7 +34,9 @@ export function LegalPage({
           <h1 className="font-heading text-3xl font-medium tracking-tight">
             {title}
           </h1>
-          <p className="text-sm text-muted-foreground">Last updated {updated}</p>
+          <p className="text-sm text-muted-foreground">
+            {t("Last updated {date}", { date: updated })}
+          </p>
           <p className="text-sm leading-6 text-muted-foreground">{intro}</p>
         </header>
 
@@ -65,7 +73,7 @@ export function LegalPage({
             {otherPage.label}
           </Link>
           <Link href="/register" className="font-medium underline">
-            Back to registration
+            {t("Back to registration")}
           </Link>
         </footer>
       </article>
