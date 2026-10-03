@@ -6,17 +6,15 @@ import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
-  IconChartBar,
-  IconDots,
   IconEye,
   IconPackage,
   IconPhoto,
   IconPlus,
   IconSearch,
-  IconUsers,
   IconWallet,
 } from "@tabler/icons-react"
 
+import { BottomNavigation } from "@/components/bottom-navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -391,7 +389,7 @@ export default function OrdersPage() {
         )}
       </div>
 
-      <BottomNavigation />
+      <BottomNavigation active="orders" />
     </main>
   )
 }
@@ -589,59 +587,5 @@ function OrderCard({
         </div>
       </CardContent>
     </Card>
-  )
-}
-
-function BottomNavigation() {
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 px-4 pb-4 pt-2 backdrop-blur">
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
-        <BottomNavItem href="/dashboard" label="Dashboard">
-          <IconChartBar className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/orders" label="Orders" active>
-          <IconPackage className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/orders/create" label="Add">
-          <IconPlus className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/customers" label="Customers">
-          <IconUsers className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/more" label="More">
-          <IconDots className="size-5" />
-        </BottomNavItem>
-      </div>
-    </nav>
-  )
-}
-
-function BottomNavItem({
-  href,
-  label,
-  active,
-  children,
-}: {
-  href: string
-  label: string
-  active?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <Link
-      href={href}
-      className={
-        active
-          ? "flex flex-col items-center gap-1 rounded-xl bg-primary px-2 py-2 text-primary-foreground"
-          : "flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-muted-foreground"
-      }
-    >
-      {children}
-      <span className="text-[11px] leading-none">{label}</span>
-    </Link>
   )
 }

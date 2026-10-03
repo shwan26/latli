@@ -1,70 +1,26 @@
-// app/more/page.tsx
-
 "use client"
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
-  IconChartBar,
-  IconDeviceFloppy,
-  IconDots,
+  IconChevronRight,
   IconLogout,
-  IconPackage,
-  IconPlus,
   IconSettings,
-  IconShoppingBag,
+  IconTruckDelivery,
   IconUser,
-  IconUsers,
 } from "@tabler/icons-react"
 
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { BottomNavigation } from "@/components/bottom-navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { LOCAL_STORAGE_KEYS } from "../lib/local-storage-keys"
-
-type ProfileSettings = {
-  shopName: string
-  ownerName: string
-  email: string
-  phone: string
-  address: string
-}
-
-const DEFAULT_PROFILE: ProfileSettings = {
-  shopName: "Order Manager",
-  ownerName: "Owner",
-  email: "",
-  phone: "",
-  address: "",
-}
-
-function getStoredProfile(): ProfileSettings {
-  if (typeof window === "undefined") return DEFAULT_PROFILE
-
-  const stored = window.localStorage.getItem(LOCAL_STORAGE_KEYS.settings)
-
-  if (!stored) return DEFAULT_PROFILE
-
-  try {
-    return {
-      ...DEFAULT_PROFILE,
-      ...(JSON.parse(stored) as Partial<ProfileSettings>),
-    }
-  } catch {
-    return DEFAULT_PROFILE
-  }
-}
+  DEFAULT_PROFILE,
+  getStoredProfile,
+  type ProfileSettings,
+} from "../lib/local-profile"
+import { getLocalCargoCompanies } from "../lib/local-shops"
 
 function getInitials(value: string) {
   const words = value.trim().split(/\s+/).filter(Boolean)
@@ -81,28 +37,18 @@ export default function MorePage() {
   const router = useRouter()
 
   const [mounted, setMounted] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [profile, setProfile] = useState<ProfileSettings>(DEFAULT_PROFILE)
+  const [cargoCount, setCargoCount] = useState(0)
 
   useEffect(() => {
-    const loadProfile = window.setTimeout(() => {
+    const loadSettings = window.setTimeout(() => {
       setProfile(getStoredProfile())
+      setCargoCount(getLocalCargoCompanies().length)
       setMounted(true)
     }, 0)
 
-    return () => window.clearTimeout(loadProfile)
+    return () => window.clearTimeout(loadSettings)
   }, [])
-
-  function updateProfile(key: keyof ProfileSettings, value: string) {
-    setSaved(false)
-    setProfile((current) => ({ ...current, [key]: value }))
-  }
-
-  function handleSave(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    window.localStorage.setItem(LOCAL_STORAGE_KEYS.settings, JSON.stringify(profile))
-    setSaved(true)
-  }
 
   function handleLogout() {
     window.localStorage.removeItem("latli_session")
@@ -114,7 +60,7 @@ export default function MorePage() {
     return (
       <main className="min-h-dvh bg-muted px-5 py-5">
         <div className="mx-auto w-full max-w-md">
-          <p className="text-sm text-muted-foreground">Loading profile...</p>
+          <p className="text-sm text-muted-foreground">Loading settings...</p>
         </div>
       </main>
     )
@@ -164,73 +110,24 @@ export default function MorePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <IconSettings className="size-5 text-muted-foreground" />
-              Profile Settings
+              Settings
             </CardTitle>
-            <CardDescription>
-              Update shop and owner details for this device.
-            </CardDescription>
           </CardHeader>
-
-          <CardContent>
-            <form onSubmit={handleSave} className="space-y-4">
-              {saved ? (
-                <Alert className="rounded-xl">
-                  <AlertDescription>Profile settings saved.</AlertDescription>
-                </Alert>
-              ) : null}
-
-              <TextInput
-                id="shopName"
-                label="Shop name"
-                value={profile.shopName}
-                onChange={(value) => updateProfile("shopName", value)}
-                placeholder="Your shop name"
-                icon={<IconShoppingBag className="size-5 text-muted-foreground" />}
-              />
-
-              <TextInput
-                id="ownerName"
-                label="Owner name"
-                value={profile.ownerName}
-                onChange={(value) => updateProfile("ownerName", value)}
-                placeholder="Owner name"
-                icon={<IconUser className="size-5 text-muted-foreground" />}
-              />
-
-              <TextInput
-                id="email"
-                label="Email"
-                value={profile.email}
-                onChange={(value) => updateProfile("email", value)}
-                placeholder="you@example.com"
-                type="email"
-              />
-
-              <TextInput
-                id="phone"
-                label="Phone"
-                value={profile.phone}
-                onChange={(value) => updateProfile("phone", value)}
-                placeholder="Phone number"
-                type="tel"
-              />
-
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Textarea
-                  id="address"
-                  value={profile.address}
-                  onChange={(event) => updateProfile("address", event.target.value)}
-                  placeholder="Shop or pickup address"
-                  className="min-h-24 rounded-xl text-base"
-                />
-              </div>
-
-              <Button type="submit" className="h-12 w-full rounded-xl">
-                <IconDeviceFloppy className="mr-2 size-5" />
-                Save Settings
-              </Button>
-            </form>
+          <CardContent className="space-y-3">
+            <SettingsLink
+              href="/profile"
+              title="Profile"
+              description="Shop name, owner, phone, and address"
+              icon={<IconUser className="size-5" />}
+            />
+            <SettingsLink
+              href="/cargo"
+              title="Cargo"
+              description={`${cargoCount} saved cargo compan${
+                cargoCount === 1 ? "y" : "ies"
+              }`}
+              icon={<IconTruckDelivery className="size-5" />}
+            />
           </CardContent>
         </Card>
 
@@ -245,101 +142,37 @@ export default function MorePage() {
         </Button>
       </div>
 
-      <BottomNavigation />
+      <BottomNavigation active="more" />
     </main>
   )
 }
 
-function TextInput({
-  id,
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
+function SettingsLink({
+  href,
+  title,
+  description,
   icon,
 }: {
-  id: string
-  label: string
-  value: string
-  onChange: (value: string) => void
-  placeholder?: string
-  type?: string
-  icon?: React.ReactNode
-}) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        {icon ? (
-          <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
-            {icon}
-          </div>
-        ) : null}
-        <Input
-          id={id}
-          type={type}
-          inputMode={type === "email" ? "email" : type === "tel" ? "tel" : undefined}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          className={icon ? "h-12 rounded-xl pl-10 text-base" : "h-12 rounded-xl text-base"}
-        />
-      </div>
-    </div>
-  )
-}
-
-function BottomNavigation() {
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 px-4 pb-4 pt-2 backdrop-blur">
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
-        <BottomNavItem href="/dashboard" label="Dashboard">
-          <IconChartBar className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/orders" label="Orders">
-          <IconPackage className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/orders/create" label="Add">
-          <IconPlus className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/customers" label="Customers">
-          <IconUsers className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/more" label="More" active>
-          <IconDots className="size-5" />
-        </BottomNavItem>
-      </div>
-    </nav>
-  )
-}
-
-function BottomNavItem({
-  href,
-  label,
-  active,
-  children,
-}: {
   href: string
-  label: string
-  active?: boolean
-  children: React.ReactNode
+  title: string
+  description: string
+  icon: React.ReactNode
 }) {
   return (
     <Link
       href={href}
-      className={
-        active
-          ? "flex flex-col items-center gap-1 rounded-xl bg-primary px-2 py-2 text-primary-foreground"
-          : "flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-muted-foreground"
-      }
+      className="flex min-h-16 w-full items-center gap-3 rounded-2xl border bg-background px-3 py-3 text-left"
     >
-      {children}
-      <span className="text-[11px] leading-none">{label}</span>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium">{title}</span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+          {description}
+        </span>
+      </span>
+      <IconChevronRight className="size-5 shrink-0 text-muted-foreground" />
     </Link>
   )
 }

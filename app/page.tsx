@@ -66,18 +66,6 @@ export default function Home() {
             <span className="font-heading text-xl font-semibold">Latli</span>
           </Link>
 
-          <nav className="hidden items-center gap-7 text-sm font-medium text-[#605848] md:flex">
-            <Link href="/dashboard" className="transition hover:text-[#171512]">
-              Dashboard
-            </Link>
-            <Link href="/orders" className="transition hover:text-[#171512]">
-              Orders
-            </Link>
-            <Link href="/customers" className="transition hover:text-[#171512]">
-              Customers
-            </Link>
-          </nav>
-
           <Button asChild className="h-10 rounded-lg px-5 tracking-normal">
             <Link href="/login">Login</Link>
           </Button>
@@ -108,18 +96,10 @@ export default function Home() {
                 size="lg"
                 className="h-12 rounded-lg px-6 text-sm tracking-normal"
               >
-                <Link href="/dashboard">
-                  Open dashboard
+                <Link href="/login">
+                  Login
                   <IconArrowRight className="size-4" />
                 </Link>
-              </Button>
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="h-12 rounded-lg border-[#cfc4b4] bg-transparent px-6 text-sm tracking-normal hover:bg-[#eee7dc]"
-              >
-                <Link href="/orders/create">Create order</Link>
               </Button>
             </div>
 
