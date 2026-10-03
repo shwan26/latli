@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { UpgradeLink } from "@/components/upgrade-link"
 import {
   DEFAULT_PROFILE,
   fetchProfile,
@@ -272,6 +273,12 @@ export default function ProfilePage() {
                 Managers on the Pro plan read order screenshots with Gemini.
                 Everyone else reads them on this device. Plan and role are set
                 by an admin.
+                {profile.plan === "pro" ? null : (
+                  <>
+                    {" "}
+                    Want Pro? Contact <UpgradeLink account={profile} />.
+                  </>
+                )}
               </p>
               <Button type="submit" className="h-12 w-full rounded-xl" disabled={saving}>
                 <IconDeviceFloppy className="mr-2 size-5" />

@@ -47,7 +47,8 @@ import {
   removePhotos,
   uploadPhoto,
 } from "@/lib/db/photos"
-import { fetchProfile } from "@/lib/profile"
+import { UpgradeLink } from "@/components/upgrade-link"
+import { fetchProfile, type ProfileSettings } from "@/lib/profile"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
 import { messageOf } from "@/lib/db/shared"
@@ -94,6 +95,7 @@ export default function OrderDetailsPage() {
   const [savedPhotoUrl, setSavedPhotoUrl] = useState("")
   const [photoExpiresAt, setPhotoExpiresAt] = useState("")
   const [isPro, setIsPro] = useState(false)
+  const [account, setAccount] = useState<ProfileSettings | null>(null)
   const [keeping, setKeeping] = useState(false)
 
   useEffect(() => {
@@ -137,6 +139,7 @@ export default function OrderDetailsPage() {
 
           if (path) setSavedPhotoUrl(urls[path] ?? "")
           setIsPro(profile?.plan === "pro")
+          setAccount(profile)
           // Show the earliest date, since that is when the first photo goes.
           setPhotoExpiresAt(Object.values(expiry).sort()[0] ?? "")
         }
@@ -416,7 +419,8 @@ export default function OrderDetailsPage() {
                   </Button>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Pro accounts can keep photos for a month.
+                    Pro accounts can keep photos for a month. To upgrade, contact{" "}
+                    <UpgradeLink account={account ?? undefined} />.
                   </p>
                 )}
               </div>

@@ -18,6 +18,7 @@ import {
 } from "@tabler/icons-react"
 
 import { SearchPicker } from "@/components/search-picker"
+import { UpgradeLink } from "@/components/upgrade-link"
 import { canUseGemini, fetchProfile } from "@/lib/profile"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
@@ -810,7 +811,8 @@ export default function CreateOrderPage() {
             />
             <p className="text-xs text-muted-foreground">
               Photos are deleted 7 days after you save the order. Pro accounts
-              can keep them for a month from the order page.
+              can keep them for a month from the order page. To upgrade,
+              contact <UpgradeLink />.
             </p>
 
             {productPhotoPreview ? (

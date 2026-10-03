@@ -57,7 +57,8 @@ import {
   removePhotos,
   uploadPhoto,
 } from "@/lib/db/photos"
-import { fetchProfile } from "@/lib/profile"
+import { UpgradeLink } from "@/components/upgrade-link"
+import { fetchProfile, type ProfileSettings } from "@/lib/profile"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
 import { messageOf } from "@/lib/db/shared"
@@ -117,6 +118,7 @@ export default function ShopsPage() {
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
   const [photoExpiry, setPhotoExpiry] = useState<Record<string, string>>({})
   const [isPro, setIsPro] = useState(false)
+  const [account, setAccount] = useState<ProfileSettings | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -143,6 +145,7 @@ export default function ShopsPage() {
         setPhotoUrls(urls)
         setPhotoExpiry(expiry)
         setIsPro(profile?.plan === "pro")
+        setAccount(profile)
       } catch (error) {
         if (!cancelled) setErrorMessage(messageOf(error, "Could not load shops."))
       } finally {
@@ -583,6 +586,7 @@ export default function ShopsPage() {
               photoUrls={photoUrls}
               photoExpiry={photoExpiry}
               isPro={isPro}
+              account={account}
               onKeepPhotos={handleKeepPhotos}
               errorMessage={errorMessage}
               savedMessage={savedMessage}
@@ -649,6 +653,7 @@ function ShopDetail({
   photoUrls,
   photoExpiry,
   isPro,
+  account,
   onKeepPhotos,
   errorMessage,
   savedMessage,
@@ -669,6 +674,7 @@ function ShopDetail({
   photoUrls: Record<string, string>
   photoExpiry: Record<string, string>
   isPro: boolean
+  account: ProfileSettings | null
   onKeepPhotos: () => void
   errorMessage: string
   savedMessage: string
@@ -810,7 +816,13 @@ function ShopDetail({
           <div className="space-y-2 rounded-2xl border p-3">
             <p className="text-sm text-muted-foreground">
               Product photos are deleted 7 days after they are saved.
-              {isPro ? "" : " Pro accounts can keep them for a month."}
+              {isPro ? null : (
+                <>
+                  {" "}
+                  Pro accounts can keep them for a month. To upgrade, contact{" "}
+                  <UpgradeLink account={account ?? undefined} />.
+                </>
+              )}
             </p>
             {isPro ? (
               <Button

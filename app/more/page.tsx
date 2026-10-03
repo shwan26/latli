@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import {
   IconChevronRight,
   IconLogout,
+  IconLifebuoy,
   IconSettings,
   IconTruckDelivery,
   IconUser,
@@ -22,6 +23,8 @@ import {
 } from "@/lib/profile"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
+import { UpgradeLink } from "@/components/upgrade-link"
+import { supportMailto } from "@/lib/support"
 import { countCargo } from "@/lib/db/cargo"
 import {
   getLocalDataSummary,
@@ -223,6 +226,28 @@ export default function MorePage() {
               }`}
               icon={<IconTruckDelivery className="size-5" />}
             />
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[20px] shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <IconLifebuoy className="size-5 text-muted-foreground" />
+              Help
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <SettingsLink
+              href={supportMailto("ticket", profile)}
+              title="Raise a ticket"
+              description="Email support with your account details filled in"
+              icon={<IconLifebuoy className="size-5" />}
+            />
+            {profile.plan === "pro" ? null : (
+              <p className="text-sm text-muted-foreground">
+                To upgrade to Pro, contact <UpgradeLink account={profile} />.
+              </p>
+            )}
           </CardContent>
         </Card>
 
