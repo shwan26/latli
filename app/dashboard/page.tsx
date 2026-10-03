@@ -6,17 +6,19 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   IconAlertCircle,
+  IconArrowBackUp,
   IconChartBar,
-  IconClock,
-  IconDots,
+  IconBox,
+  IconCircleCheck,
   IconPackage,
   IconPlus,
   IconShoppingBag,
+  IconShoppingCartOff,
   IconTruckDelivery,
-  IconUsers,
   IconWallet,
 } from "@tabler/icons-react"
 
+import { BottomNavigation } from "@/components/bottom-navigation"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -24,118 +26,145 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 
-import {
-  getOrdersFromLocalStorage,
-  resetOrdersLocalStorage,
-  type LocalOrder,
-} from "../lib/local-orders"
+import { type LocalOrder } from "../lib/local-orders"
+import { listOrders } from "@/lib/db/orders"
+import { messageOf } from "@/lib/db/shared"
 
 import {
   formatBaht,
   formatKyat,
   getOrderRate,
 } from "../lib/currency"
+import { useI18n } from "@/lib/i18n/provider"
+import { translate } from "@/lib/i18n/runtime"
 
 export default function DashboardPage() {
+  const { t } = useI18n()
+
   const [orders, setOrders] = useState<LocalOrder[]>([])
   const [mounted, setMounted] = useState(false)
+  const [loadError, setLoadError] = useState("")
 
   useEffect(() => {
-    const loadOrders = window.setTimeout(() => {
-      setOrders(getOrdersFromLocalStorage())
-      setMounted(true)
-    }, 0)
+    let cancelled = false
 
-    return () => window.clearTimeout(loadOrders)
+    async function load() {
+      try {
+        const loaded = await listOrders()
+
+        if (!cancelled) setOrders(loaded)
+      } catch (error) {
+        if (!cancelled) setLoadError(messageOf(error, translate("Could not load orders.")))
+      } finally {
+        if (!cancelled) setMounted(true)
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const summary = useMemo(() => {
-    const ordersToBuy = orders.filter(
-      (order) =>
-        order.deliveryStatus === "not_arranged" &&
-        order.paymentStatus !== "refunded"
-    )
+    const withStatus = (status: LocalOrder["orderStatus"]) =>
+      orders.filter((order) => order.orderStatus === status)
 
-    const waitingPayment = orders.filter(
-      (order) =>
-        order.paymentStatus === "not_paid" ||
-        order.paymentStatus === "receiving"
+    // Refunded orders are not waiting to be bought.
+    const notBought = withStatus("not_bought").filter(
+      (order) => order.paymentStatus !== "refunded"
     )
+    const bought = withStatus("bought")
+    const sentCargo = withStatus("sent_cargo")
+    const delivered = withStatus("delivered")
+    const complete = withStatus("complete")
 
-    const unpaidBalance = orders.filter(
+    const unpaid = orders.filter(
       (order) =>
         order.remainingBalanceThb > 0 &&
         order.paymentStatus !== "fully_paid" &&
         order.paymentStatus !== "refunded"
     )
 
-    const productBought = orders.filter(
-      (order) => order.deliveryStatus === "product_bought"
+    const refunded = orders.filter(
+      (order) => order.paymentStatus === "refunded"
     )
 
-    const inDelivery = orders.filter(
-      (order) =>
-        order.deliveryStatus === "sent_to_cargo" ||
-        order.deliveryStatus === "in_transit" ||
-        order.deliveryStatus === "picked_up"
+    // Orders to buy, one line per shop. Orders without a shop name are
+    // grouped under "No shop".
+    const countsByShop = new Map<string, { label: string; count: number }>()
+    let noShopCount = 0
+
+    for (const order of notBought) {
+      const label = order.retailerName?.trim()
+
+      if (!label) {
+        noShopCount += 1
+        continue
+      }
+
+      const key = label.toLowerCase()
+      const entry = countsByShop.get(key)
+
+      if (entry) {
+        entry.count += 1
+      } else {
+        countsByShop.set(key, { label, count: 1 })
+      }
+    }
+
+    const shopLines = [...countsByShop.values()].sort((a, b) =>
+      a.label.localeCompare(b.label)
     )
 
-    const totalSalesThb = orders.reduce(
-      (sum, order) => sum + order.totalCustomerPayableThb,
-      0
+    // Refunded orders are not real sales, so they stay out of sales and profit.
+    const soldOrders = orders.filter(
+      (order) => order.paymentStatus !== "refunded"
     )
 
-    const totalSalesMmk = orders.reduce(
-      (sum, order) =>
-        sum + order.totalCustomerPayableThb * getOrderRate(order),
-      0
-    )
+    const sum = (
+      list: LocalOrder[],
+      value: (order: LocalOrder) => number
+    ) => list.reduce((total, order) => total + value(order), 0)
 
-    const unpaidBalanceThb = unpaidBalance.reduce(
-      (sum, order) => sum + order.remainingBalanceThb,
-      0
-    )
+    const withRate = (value: (order: LocalOrder) => number) =>
+      (order: LocalOrder) => value(order) * getOrderRate(order)
 
-    const unpaidBalanceMmk = unpaidBalance.reduce(
-      (sum, order) => sum + order.remainingBalanceThb * getOrderRate(order),
-      0
-    )
-
-    const profitThb = orders.reduce((sum, order) => sum + order.profitThb, 0)
-
-    const profitMmk = orders.reduce(
-      (sum, order) => sum + order.profitThb * getOrderRate(order),
-      0
-    )
+    const salesThb = (order: LocalOrder) => order.totalCustomerPayableThb
+    const profitThb = (order: LocalOrder) => order.profitThb
+    const unpaidThb = (order: LocalOrder) => order.remainingBalanceThb
+    const refundThb = (order: LocalOrder) => order.totalPaidThb
 
     return {
-      ordersToBuy,
-      ordersToBuyCount: ordersToBuy.length,
-      waitingPaymentCount: waitingPayment.length,
-      unpaidBalanceCount: unpaidBalance.length,
-      productBoughtCount: productBought.length,
-      inDeliveryCount: inDelivery.length,
-      totalSalesThb,
-      totalSalesMmk,
-      unpaidBalanceThb,
-      unpaidBalanceMmk,
-      profitThb,
-      profitMmk,
+      notBoughtCount: notBought.length,
+      boughtCount: bought.length,
+      sentCargoCount: sentCargo.length,
+      deliveredCount: delivered.length,
+      completeCount: complete.length,
+      unpaidCount: unpaid.length,
+      refundCount: refunded.length,
+      shopLines,
+      noShopCount,
+      totalSalesThb: sum(soldOrders, salesThb),
+      totalSalesMmk: sum(soldOrders, withRate(salesThb)),
+      profitThb: sum(soldOrders, profitThb),
+      profitMmk: sum(soldOrders, withRate(profitThb)),
+      unpaidThb: sum(unpaid, unpaidThb),
+      unpaidMmk: sum(unpaid, withRate(unpaidThb)),
+      refundThb: sum(refunded, refundThb),
+      refundMmk: sum(refunded, withRate(refundThb)),
     }
   }, [orders])
-
-  function resetDemoData() {
-    const orders = resetOrdersLocalStorage()
-    setOrders(orders)
-  }
 
   if (!mounted) {
     return (
       <main className="min-h-dvh bg-muted px-5 py-5">
         <div className="mx-auto w-full max-w-md">
-          <p className="text-sm text-muted-foreground">Loading dashboard...</p>
+          <p className="text-sm text-muted-foreground">{t("Loading dashboard...")}</p>
         </div>
       </main>
     )
@@ -146,14 +175,12 @@ export default function DashboardPage() {
       <header className="sticky top-0 z-10 border-b bg-background/95 px-5 py-4 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-muted-foreground">Welcome back</p>
-            <h1 className="font-heading text-2xl font-medium tracking-tight">
-              Dashboard
-            </h1>
+            <p className="text-sm text-muted-foreground">{t("Welcome back")}</p>
+            <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Dashboard")}</h1>
           </div>
 
           <Button asChild size="icon" className="size-11 rounded-xl">
-            <Link href="/orders/create" aria-label="Add order">
+            <Link href="/orders/create" aria-label={t("Add order")}>
               <IconPlus className="size-5" />
             </Link>
           </Button>
@@ -161,136 +188,99 @@ export default function DashboardPage() {
       </header>
 
       <div className="mx-auto w-full max-w-md space-y-5 px-5 py-5">
+        {loadError ? (
+          <Alert variant="destructive" className="rounded-xl">
+            <AlertDescription>{loadError}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        <section className="space-y-3">
+          <h2 className="font-heading text-lg font-medium">{t("Orders")}</h2>
+
+          <div className="grid grid-cols-2 gap-3">
+            <StatusMiniCard
+              title={t("Not bought")}
+              value={summary.notBoughtCount}
+              icon={IconShoppingCartOff}
+            />
+            <StatusMiniCard
+              title={t("Bought")}
+              value={summary.boughtCount}
+              icon={IconPackage}
+            />
+            <StatusMiniCard
+              title={t("With cargo")}
+              value={summary.sentCargoCount}
+              icon={IconTruckDelivery}
+            />
+            <StatusMiniCard
+              title={t("Delivered")}
+              value={summary.deliveredCount}
+              icon={IconBox}
+            />
+            <StatusMiniCard
+              title={t("Complete")}
+              value={summary.completeCount}
+              icon={IconCircleCheck}
+            />
+            <StatusMiniCard
+              title={t("Unpaid")}
+              value={summary.unpaidCount}
+              icon={IconAlertCircle}
+            />
+          </div>
+        </section>
+
         <Card className="rounded-[20px] shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2 text-base font-medium">
-                <IconShoppingBag className="size-5 text-muted-foreground" />
-                Orders to Buy
-              </span>
-              <Badge variant={summary.ordersToBuyCount > 0 ? "default" : "secondary"}>
-                {summary.ordersToBuyCount}
+                <IconShoppingBag className="size-5 text-muted-foreground" />{t("Orders to buy")}</span>
+              <Badge variant={summary.notBoughtCount > 0 ? "default" : "secondary"}>
+                {summary.notBoughtCount}
               </Badge>
             </CardTitle>
           </CardHeader>
 
           <CardContent className="space-y-3">
-            {summary.ordersToBuy.length === 0 ? (
+            {summary.notBoughtCount === 0 ? (
               <div className="rounded-2xl bg-muted p-4">
-                <p className="text-sm font-medium">No orders waiting to buy</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  New customer orders with delivery status Not Arranged will show here.
-                </p>
+                <p className="text-sm font-medium">{t("No orders waiting to buy")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("New customer orders with status Not bought will show here.")}</p>
               </div>
             ) : (
-              summary.ordersToBuy.slice(0, 5).map((order) => (
-                <OrderToBuyRow key={order.id} order={order} />
-              ))
+              <ul className="divide-y rounded-2xl border bg-background">
+                {summary.shopLines.map((shop) => (
+                  <ShopLine
+                    key={shop.label.toLowerCase()}
+                    label={shop.label}
+                    count={shop.count}
+                  />
+                ))}
+                {summary.noShopCount > 0 ? (
+                  <ShopLine label={t("No shop")} count={summary.noShopCount} />
+                ) : null}
+              </ul>
             )}
 
             <div className="grid grid-cols-2 gap-3">
               <Button asChild variant="outline" className="h-11 rounded-xl">
-                <Link href="/orders">View all</Link>
+                <Link href="/orders">{t("View all")}</Link>
               </Button>
               <Button asChild className="h-11 rounded-xl">
                 <Link href="/orders/create">
-                  <IconPlus className="mr-2 size-4" />
-                  Add order
-                </Link>
+                  <IconPlus className="mr-2 size-4" />{t("Add order")}</Link>
               </Button>
             </div>
-          </CardContent>
-        </Card>
-
-        <section className="grid grid-cols-2 gap-3">
-          <StatusMiniCard
-            title="Waiting Pay"
-            value={summary.waitingPaymentCount}
-            icon={IconClock}
-          />
-          <StatusMiniCard
-            title="Bought"
-            value={summary.productBoughtCount}
-            icon={IconPackage}
-          />
-          <StatusMiniCard
-            title="With Cargo"
-            value={summary.inDeliveryCount}
-            icon={IconTruckDelivery}
-          />
-          <StatusMiniCard
-            title="Unpaid"
-            value={summary.unpaidBalanceCount}
-            icon={IconAlertCircle}
-          />
-        </section>
-
-        <Card className="rounded-[20px] shadow-none">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base font-medium">
-              <IconWallet className="size-5 text-muted-foreground" />
-              Currency Summary
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-muted p-4">
-                <p className="text-xs text-muted-foreground">Thai Baht</p>
-                <p className="mt-1 text-xl font-semibold">
-                  {formatBaht(summary.totalSalesThb)}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Total sales
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-muted p-4">
-                <p className="text-xs text-muted-foreground">Myanmar Kyat</p>
-                <p className="mt-1 text-xl font-semibold">
-                  {formatKyat(summary.totalSalesMmk)}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Converted total
-                </p>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 w-full rounded-xl"
-              onClick={resetDemoData}
-            >
-              Reset demo local data
-            </Button>
           </CardContent>
         </Card>
 
         <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-heading text-lg font-medium">
-              Money
-            </h2>
-
-            <Button asChild variant="ghost" size="sm" className="rounded-xl">
-              <Link href="/orders">View all</Link>
-            </Button>
-          </div>
+          <h2 className="font-heading text-lg font-medium">{t("Money")}</h2>
 
           <DashboardMoneyCard
-            title="Unpaid Balance"
-            description={`${summary.unpaidBalanceCount} orders still have balance`}
-            href="/orders"
-            icon={IconAlertCircle}
-            badge="Action"
-            baht={summary.unpaidBalanceThb}
-            kyat={summary.unpaidBalanceMmk}
-          />
-
-          <DashboardMoneyCard
-            title="Total Sales"
-            description="Total customer payable"
+            title={t("Total sales")}
+            description={t("Customer payable, refunds excluded")}
             href="/orders"
             icon={IconChartBar}
             baht={summary.totalSalesThb}
@@ -298,62 +288,52 @@ export default function DashboardPage() {
           />
 
           <DashboardMoneyCard
-            title="Profit"
-            description="Owner only"
+            title={t("Profit")}
+            description={t("Owner only")}
             href="/orders"
             icon={IconWallet}
             badge="Owner"
             baht={summary.profitThb}
             kyat={summary.profitMmk}
           />
+
+          <DashboardMoneyCard
+            title={t("Unpaid")}
+            description={`${summary.unpaidCount} ${summary.unpaidCount === 1 ? "order" : "orders"} still have balance`}
+            href="/orders"
+            icon={IconAlertCircle}
+            badge="Action"
+            baht={summary.unpaidThb}
+            kyat={summary.unpaidMmk}
+          />
+
+          <DashboardMoneyCard
+            title={t("Refund")}
+            description={`${summary.refundCount} refunded ${summary.refundCount === 1 ? "order" : "orders"}`}
+            href="/orders"
+            icon={IconArrowBackUp}
+            baht={summary.refundThb}
+            kyat={summary.refundMmk}
+          />
         </section>
+
       </div>
 
-      <BottomNavigation />
+      <BottomNavigation active="dashboard" />
     </main>
   )
 }
 
-function OrderToBuyRow({ order }: { order: LocalOrder }) {
+function ShopLine({ label, count }: { label: string; count: number }) {
+  const { t } = useI18n()
+
   return (
-    <Link
-      href={`/orders/${order.id}`}
-      className="block rounded-2xl border bg-background px-4 py-3 transition active:scale-[0.99]"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">
-            {order.productName || "Product photo order"}
-          </p>
-          <p className="mt-1 truncate text-xs text-muted-foreground">
-            {order.customerName}
-            {order.productSize || order.productOption
-              ? ` · Size ${order.productSize || order.productOption}`
-              : ""}
-            {order.productColor ? ` · ${order.productColor}` : ""}
-          </p>
-        </div>
-
-        <Badge variant="outline" className="shrink-0">
-          {order.quantity || 1} item{(order.quantity || 1) === 1 ? "" : "s"}
-        </Badge>
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-muted px-3 py-2">
-          <p className="text-[11px] text-muted-foreground">Cost</p>
-          <p className="mt-0.5 text-sm font-semibold">
-            {formatBaht(order.totalRetailerCostThb)}
-          </p>
-        </div>
-        <div className="rounded-xl bg-muted px-3 py-2">
-          <p className="text-[11px] text-muted-foreground">Selling</p>
-          <p className="mt-0.5 text-sm font-semibold">
-            {formatBaht(order.totalCustomerPayableThb)}
-          </p>
-        </div>
-      </div>
-    </Link>
+    <li className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+      <span className="min-w-0 truncate font-medium">{label}</span>
+      <span className="shrink-0 text-muted-foreground">
+        {t(count === 1 ? "{count} order" : "{count} orders", { count })}
+      </span>
+    </li>
   )
 }
 
@@ -398,6 +378,8 @@ function DashboardMoneyCard({
   baht: number
   kyat: number
 }) {
+  const { t } = useI18n()
+
   return (
     <Link href={href} className="block">
       <Card className="rounded-[20px] shadow-none transition active:scale-[0.99]">
@@ -425,14 +407,14 @@ function DashboardMoneyCard({
 
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <div className="rounded-xl border bg-background px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">Baht</p>
+                  <p className="text-[11px] text-muted-foreground">{t("Baht")}</p>
                   <p className="mt-0.5 text-sm font-semibold">
                     {formatBaht(baht)}
                   </p>
                 </div>
 
                 <div className="rounded-xl border bg-background px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">Kyat</p>
+                  <p className="text-[11px] text-muted-foreground">{t("Kyat")}</p>
                   <p className="mt-0.5 text-sm font-semibold">
                     {formatKyat(kyat)}
                   </p>
@@ -442,60 +424,6 @@ function DashboardMoneyCard({
           </div>
         </CardContent>
       </Card>
-    </Link>
-  )
-}
-
-function BottomNavigation() {
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 px-4 pb-4 pt-2 backdrop-blur">
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
-        <BottomNavItem href="/dashboard" label="Dashboard" active>
-          <IconChartBar className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/orders" label="Orders">
-          <IconPackage className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/orders/create" label="Add">
-          <IconPlus className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/customers" label="Customers">
-          <IconUsers className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/more" label="More">
-          <IconDots className="size-5" />
-        </BottomNavItem>
-      </div>
-    </nav>
-  )
-}
-
-function BottomNavItem({
-  href,
-  label,
-  active,
-  children,
-}: {
-  href: string
-  label: string
-  active?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <Link
-      href={href}
-      className={
-        active
-          ? "flex flex-col items-center gap-1 rounded-xl bg-primary px-2 py-2 text-primary-foreground"
-          : "flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-muted-foreground"
-      }
-    >
-      {children}
-      <span className="text-[11px] leading-none">{label}</span>
     </Link>
   )
 }

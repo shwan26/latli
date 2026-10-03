@@ -8,11 +8,8 @@ import { useRouter } from "next/navigation"
 import {
   IconEye,
   IconEyeOff,
-  IconLock,
-  IconMail,
   IconShieldCheck,
   IconShoppingBag,
-  IconUser,
 } from "@tabler/icons-react"
 
 import { Button } from "@/components/ui/button"
@@ -26,8 +23,23 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { createClient } from "@/lib/supabase/client"
+import { useI18n } from "@/lib/i18n/provider"
+import { LanguageSwitch } from "@/components/language-switch"
+import { RichText } from "@/components/rich-text"
 
 export default function CreateAccountPage() {
+  const { t } = useI18n()
+
   const router = useRouter()
 
   const [showPassword, setShowPassword] = useState(false)
@@ -35,79 +47,130 @@ export default function CreateAccountPage() {
 
   const [shopName, setShopName] = useState("")
   const [ownerName, setOwnerName] = useState("")
+  const [age, setAge] = useState("")
+  const [gender, setGender] = useState("")
+  const [agreed, setAgreed] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
 
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [confirmationSent, setConfirmationSent] = useState(false)
 
   async function handleCreateAccount(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError("")
 
-    if (!shopName || !ownerName || !email || !password || !confirmPassword) {
-      setError("Please fill in all required fields.")
+    if (
+      !shopName ||
+      !ownerName ||
+      !age ||
+      !email ||
+      !password ||
+      !confirmPassword
+    ) {
+      setError(t("Please fill in all required fields."))
+      return
+    }
+
+    const ageNumber = Number(age)
+
+    if (!Number.isInteger(ageNumber) || ageNumber < 13 || ageNumber > 120) {
+      setError(t("Enter a valid age between 13 and 120."))
       return
     }
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.")
+      setError(t("Password must be at least 8 characters."))
       return
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.")
+      setError(t("Passwords do not match."))
+      return
+    }
+
+    if (!agreed) {
+      setError(t("Please agree to the Terms of Service and Privacy Policy."))
+      return
+    }
+
+    if (!isSupabaseConfigured) {
+      setError(t("Supabase is not set up. See supabase/README.md."))
       return
     }
 
     setLoading(true)
 
-    try {
-      // TODO: connect this to your real register/auth logic
-      console.log({
-        shopName,
-        ownerName,
-        email,
-        password,
-      })
+    const { data, error: signUpError } = await createClient().auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        // The database trigger copies these into the new profile.
+        data: {
+          shop_name: shopName.trim(),
+          owner_name: ownerName.trim(),
+          age: ageNumber,
+          gender,
+          terms_accepted: true,
+        },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
 
-      router.push("/login")
-    } catch {
-      setError("Could not create account. Please try again.")
-    } finally {
+    if (signUpError) {
+      setError(t(signUpError.message))
       setLoading(false)
+      return
     }
+
+    if (data.session) {
+      // Email confirmation is off in Supabase, so the user is already signed in.
+      router.push("/dashboard")
+      router.refresh()
+      return
+    }
+
+    setConfirmationSent(true)
+    setLoading(false)
   }
 
   return (
     <main className="min-h-dvh bg-muted px-5 py-8 flex flex-col items-center justify-center">
       <div className="w-full max-w-sm flex flex-col items-center">
+        <div className="mb-4 flex w-full justify-end">
+          <LanguageSwitch />
+        </div>
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 size-16 rounded-[20px] bg-primary flex items-center justify-center">
             <IconShoppingBag className="size-8 text-primary-foreground" />
           </div>
 
-          <h1 className="font-heading text-2xl font-medium tracking-tight">
-            Create account
-          </h1>
+          <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Create account")}</h1>
 
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Set up your shop to manage orders and deliveries.
-          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">{t("Set up your shop to manage orders and deliveries.")}</p>
         </div>
 
         <Card className="w-full rounded-[20px] shadow-none">
           <CardHeader className="px-6 pt-6 pb-0 space-y-1">
-            <CardTitle className="text-xl font-medium">
-              Register your shop
-            </CardTitle>
-            <CardDescription>
-              Enter your details to create an owner account.
-            </CardDescription>
+            <CardTitle className="text-xl font-medium">{t("Register your shop")}</CardTitle>
+            <CardDescription>{t("Enter your details to create an owner account.")}</CardDescription>
           </CardHeader>
 
           <CardContent className="px-6 pb-6 pt-5">
+            {confirmationSent ? (
+              <div className="space-y-5">
+                <Alert className="rounded-xl">
+                  <AlertDescription>
+                    {t("We sent a confirmation link to {email}. Open it to activate your account, then log in.", { email: email.trim() })}
+                  </AlertDescription>
+                </Alert>
+                <Button asChild className="w-full h-12 rounded-xl text-base">
+                  <Link href="/login">{t("Go to login")}</Link>
+                </Button>
+              </div>
+            ) : (
             <form onSubmit={handleCreateAccount} className="space-y-5">
               {error && (
                 <Alert variant="destructive" className="rounded-xl">
@@ -116,47 +179,79 @@ export default function CreateAccountPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="shopName">Shop name</Label>
+                <Label htmlFor="shopName">{t("Shop name")}</Label>
 
                 <div className="relative">
-                  <IconShoppingBag className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground pointer-events-none" />
-
                   <Input
                     id="shopName"
                     type="text"
                     autoComplete="organization"
-                    placeholder="Your shop name"
+                    placeholder={t("Your shop name")}
                     value={shopName}
                     onChange={(event) => setShopName(event.target.value)}
-                    className="h-12 pl-10 rounded-xl text-base"
+                    className="h-12 rounded-xl text-base"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ownerName">Owner name</Label>
+                <Label htmlFor="ownerName">{t("Owner name")}</Label>
 
                 <div className="relative">
-                  <IconUser className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground pointer-events-none" />
-
                   <Input
                     id="ownerName"
                     type="text"
                     autoComplete="name"
-                    placeholder="Your name"
+                    placeholder={t("Your name")}
                     value={ownerName}
                     onChange={(event) => setOwnerName(event.target.value)}
-                    className="h-12 pl-10 rounded-xl text-base"
+                    className="h-12 rounded-xl text-base"
                   />
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="age">{t("Age")}</Label>
+                  <Input
+                    id="age"
+                    type="number"
+                    inputMode="numeric"
+                    min="13"
+                    max="120"
+                    placeholder={t("Age")}
+                    value={age}
+                    onChange={(event) => setAge(event.target.value)}
+                    className="h-12 rounded-xl text-base"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gender">{t("Gender (optional)")}</Label>
+                  <Select
+                    value={gender || "unset"}
+                    onValueChange={(value) =>
+                      setGender(value === "unset" ? "" : value)
+                    }
+                  >
+                    <SelectTrigger id="gender" className="h-12 w-full rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unset">{t("Not set")}</SelectItem>
+                      <SelectItem value="female">{t("Female")}</SelectItem>
+                      <SelectItem value="male">{t("Male")}</SelectItem>
+                      <SelectItem value="other">{t("Other")}</SelectItem>
+                      <SelectItem value="prefer_not_to_say">{t("Prefer not to say")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="email">Email address</Label>
+                <Label htmlFor="email">{t("Email address")}</Label>
 
                 <div className="relative">
-                  <IconMail className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground pointer-events-none" />
-
                   <Input
                     id="email"
                     type="email"
@@ -165,25 +260,23 @@ export default function CreateAccountPage() {
                     placeholder="you@example.com"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    className="h-12 pl-10 rounded-xl text-base"
+                    className="h-12 rounded-xl text-base"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("Password")}</Label>
 
                 <div className="relative">
-                  <IconLock className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground pointer-events-none" />
-
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    placeholder="Create a password"
+                    placeholder={t("Create a password")}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    className="h-12 pl-10 pr-12 rounded-xl text-base"
+                    className="h-12 pr-12 rounded-xl text-base"
                   />
 
                   <button
@@ -200,27 +293,23 @@ export default function CreateAccountPage() {
                   </button>
                 </div>
 
-                <p className="text-xs text-muted-foreground">
-                  Use at least 8 characters.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("Use at least 8 characters.")}</p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm password</Label>
+                <Label htmlFor="confirmPassword">{t("Confirm password")}</Label>
 
                 <div className="relative">
-                  <IconLock className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground pointer-events-none" />
-
                   <Input
                     id="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    placeholder="Confirm your password"
+                    placeholder={t("Confirm your password")}
                     value={confirmPassword}
                     onChange={(event) =>
                       setConfirmPassword(event.target.value)
                     }
-                    className="h-12 pl-10 pr-12 rounded-xl text-base"
+                    className="h-12 pr-12 rounded-xl text-base"
                   />
 
                   <button
@@ -242,13 +331,42 @@ export default function CreateAccountPage() {
                 </div>
               </div>
 
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="terms"
+                  checked={agreed}
+                  onCheckedChange={(checked) => setAgreed(checked === true)}
+                  className="mt-0.5"
+                />
+                <Label
+                  htmlFor="terms"
+                  className="text-sm font-normal leading-snug text-muted-foreground"
+                >
+                  <RichText
+                    text={t("I agree to the {terms} and {privacy}.")}
+                    parts={{
+                      terms: (
+                        <Link href="/terms" className="font-medium text-foreground underline" target="_blank">
+                          {t("Terms of Service")}
+                        </Link>
+                      ),
+                      privacy: (
+                        <Link href="/privacy" className="font-medium text-foreground underline" target="_blank">
+                          {t("Privacy Policy")}
+                        </Link>
+                      ),
+                    }}
+                  />
+                </Label>
+              </div>
+
               <div className="space-y-3">
                 <Button
                   type="submit"
                   className="w-full h-12 rounded-xl text-base"
                   disabled={loading}
                 >
-                  {loading ? "Creating account…" : "Create account"}
+                  {loading ? t("Creating account…") : t("Create account")}
                 </Button>
 
                 <Button
@@ -257,17 +375,16 @@ export default function CreateAccountPage() {
                   variant="outline"
                   className="w-full h-12 rounded-xl text-base"
                 >
-                  <Link href="/login">Back to login</Link>
+                  <Link href="/login">{t("Back to login")}</Link>
                 </Button>
               </div>
             </form>
+            )}
           </CardContent>
         </Card>
 
         <p className="mt-5 text-center text-xs text-muted-foreground flex items-center gap-1.5">
-          <IconShieldCheck className="size-3.5" />
-          Owner account for shop order management
-        </p>
+          <IconShieldCheck className="size-3.5" />{t("Owner account for shop order management")}</p>
       </div>
     </main>
   )
