@@ -17,10 +17,19 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   DEFAULT_PROFILE,
-  getStoredProfile,
+  fetchProfile,
   type ProfileSettings,
-} from "../lib/local-profile"
-import { getLocalCargoCompanies } from "../lib/local-shops"
+} from "@/lib/profile"
+import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { createClient } from "@/lib/supabase/client"
+import { countCargo } from "@/lib/db/cargo"
+import {
+  getLocalDataSummary,
+  importLocalData,
+  type LocalDataSummary,
+} from "@/lib/db/import-local"
+import { messageOf } from "@/lib/db/shared"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 function getInitials(value: string) {
   const words = value.trim().split(/\s+/).filter(Boolean)
@@ -39,21 +48,70 @@ export default function MorePage() {
   const [mounted, setMounted] = useState(false)
   const [profile, setProfile] = useState<ProfileSettings>(DEFAULT_PROFILE)
   const [cargoCount, setCargoCount] = useState(0)
+  const [localData, setLocalData] = useState<LocalDataSummary | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState("")
+  const [importMessage, setImportMessage] = useState("")
 
   useEffect(() => {
-    const loadSettings = window.setTimeout(() => {
-      setProfile(getStoredProfile())
-      setCargoCount(getLocalCargoCompanies().length)
-      setMounted(true)
-    }, 0)
+    let cancelled = false
 
-    return () => window.clearTimeout(loadSettings)
+    async function load() {
+      const db = isSupabaseConfigured ? createClient() : null
+
+      const [loadedProfile, cargo, localData] = await Promise.all([
+        db ? fetchProfile(db) : null,
+        countCargo().catch(() => 0),
+        getLocalDataSummary().catch(() => null),
+      ])
+
+      if (cancelled) return
+
+      if (loadedProfile) setProfile(loadedProfile)
+      setCargoCount(cargo)
+      setLocalData(localData)
+      setMounted(true)
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  function handleLogout() {
-    window.localStorage.removeItem("latli_session")
-    window.localStorage.removeItem("latli_account")
+  async function handleImport() {
+    setImporting(true)
+    setImportMessage("")
+    setImportProgress("Starting...")
+
+    try {
+      const result = await importLocalData((done, total) =>
+        setImportProgress(`Imported ${done} of ${total}...`)
+      )
+
+      if (result.failures.length === 0) {
+        setLocalData(null)
+        setImportMessage("Your browser data was imported to your account.")
+      } else {
+        setImportMessage(
+          `${result.failures.length} item(s) could not be imported. ${result.failures
+            .slice(0, 3)
+            .join("; ")}. Press Import to try again.`
+        )
+      }
+    } catch (error) {
+      setImportMessage(messageOf(error, "Could not import your browser data."))
+    } finally {
+      setImporting(false)
+      setImportProgress("")
+    }
+  }
+
+  async function handleLogout() {
+    await createClient().auth.signOut()
     router.push("/login")
+    router.refresh()
   }
 
   if (!mounted) {
@@ -105,6 +163,43 @@ export default function MorePage() {
             </div>
           </CardContent>
         </Card>
+
+        {localData ? (
+          <Card className="rounded-[20px] shadow-none">
+            <CardHeader>
+              <CardTitle className="text-lg">Import browser data</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                This browser still holds {localData.orders} order
+                {localData.orders === 1 ? "" : "s"}, {localData.customers} customer
+                {localData.customers === 1 ? "" : "s"}, {localData.shops} shop
+                {localData.shops === 1 ? "" : "s"}, {localData.products} product
+                {localData.products === 1 ? "" : "s"} and {localData.cargo} cargo
+                compan{localData.cargo === 1 ? "y" : "ies"} from before accounts.
+                Import them to keep them in your account. The browser copy is
+                not deleted.
+              </p>
+              {importMessage ? (
+                <Alert className="rounded-xl">
+                  <AlertDescription>{importMessage}</AlertDescription>
+                </Alert>
+              ) : null}
+              <Button
+                type="button"
+                className="h-12 w-full rounded-xl"
+                disabled={importing}
+                onClick={handleImport}
+              >
+                {importing ? importProgress : "Import to my account"}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : importMessage ? (
+          <Alert className="rounded-xl">
+            <AlertDescription>{importMessage}</AlertDescription>
+          </Alert>
+        ) : null}
 
         <Card className="rounded-[20px] shadow-none">
           <CardHeader>

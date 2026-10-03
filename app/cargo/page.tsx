@@ -12,12 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  emptyCargoDraft,
-  getLocalCargoCompanies,
-  saveLocalCargoCompanies,
-  type LocalCargoCompany,
-} from "../lib/local-shops"
+import { emptyCargoDraft, type LocalCargoCompany } from "../lib/local-shops"
+import { insertCargo, listCargo } from "@/lib/db/cargo"
+import { messageOf } from "@/lib/db/shared"
 
 type CargoDraft = typeof emptyCargoDraft
 
@@ -26,14 +23,29 @@ export default function CargoPage() {
   const [companies, setCompanies] = useState<LocalCargoCompany[]>([])
   const [draft, setDraft] = useState<CargoDraft>(emptyCargoDraft)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState("")
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    const loadCargo = window.setTimeout(() => {
-      setCompanies(getLocalCargoCompanies())
-      setMounted(true)
-    }, 0)
+    let cancelled = false
 
-    return () => window.clearTimeout(loadCargo)
+    async function load() {
+      try {
+        const loaded = await listCargo()
+
+        if (!cancelled) setCompanies(loaded)
+      } catch (loadError) {
+        if (!cancelled) setError(messageOf(loadError, "Could not load cargo."))
+      } finally {
+        if (!cancelled) setMounted(true)
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   function updateDraft(key: keyof CargoDraft, value: string) {
@@ -41,23 +53,22 @@ export default function CargoPage() {
     setDraft((current) => ({ ...current, [key]: value }))
   }
 
-  function handleAddCargo(event: FormEvent<HTMLFormElement>) {
+  async function handleAddCargo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setError("")
+    setSaving(true)
 
-    const nextCompanies = [
-      ...companies,
-      {
-        id: crypto.randomUUID(),
-        ...draft,
-        name: draft.name.trim(),
-        createdAt: new Date().toISOString(),
-      },
-    ]
+    try {
+      const company = await insertCargo({ ...draft, name: draft.name.trim() })
 
-    setCompanies(nextCompanies)
-    saveLocalCargoCompanies(nextCompanies)
-    setDraft(emptyCargoDraft)
-    setSaved(true)
+      setCompanies((current) => [...current, company])
+      setDraft(emptyCargoDraft)
+      setSaved(true)
+    } catch (saveError) {
+      setError(messageOf(saveError, "Could not save the cargo company."))
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (!mounted) {
@@ -89,6 +100,12 @@ export default function CargoPage() {
       </header>
 
       <div className="mx-auto w-full max-w-md space-y-5 px-5 py-5">
+        {error ? (
+          <Alert variant="destructive" className="rounded-xl">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+
         {saved ? (
           <Alert className="rounded-xl">
             <AlertDescription>Cargo company saved.</AlertDescription>
@@ -141,9 +158,9 @@ export default function CargoPage() {
                   className="min-h-24 rounded-xl text-base"
                 />
               </div>
-              <Button type="submit" className="h-12 w-full rounded-xl">
+              <Button type="submit" className="h-12 w-full rounded-xl" disabled={saving}>
                 <IconPlus className="mr-2 size-5" />
-                Add Cargo
+                {saving ? "Saving..." : "Add Cargo"}
               </Button>
             </form>
           </CardContent>

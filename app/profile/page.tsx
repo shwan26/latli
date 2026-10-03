@@ -5,8 +5,6 @@ import Link from "next/link"
 import {
   IconArrowLeft,
   IconDeviceFloppy,
-  IconShoppingBag,
-  IconUser,
 } from "@tabler/icons-react"
 
 import { BottomNavigation } from "@/components/bottom-navigation"
@@ -16,13 +14,24 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 import {
   DEFAULT_PROFILE,
-  getStoredProfile,
-  saveStoredProfile,
+  fetchProfile,
+  saveProfile,
+  type ProfileGender,
   type ProfileSettings,
-} from "../lib/local-profile"
+} from "@/lib/profile"
+import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { createClient } from "@/lib/supabase/client"
 
 function getInitials(value: string) {
   const words = value.trim().split(/\s+/).filter(Boolean)
@@ -39,24 +48,60 @@ export default function ProfilePage() {
   const [mounted, setMounted] = useState(false)
   const [saved, setSaved] = useState(false)
   const [profile, setProfile] = useState<ProfileSettings>(DEFAULT_PROFILE)
+  const [error, setError] = useState("")
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    const loadProfile = window.setTimeout(() => {
-      setProfile(getStoredProfile())
-      setMounted(true)
-    }, 0)
+    let cancelled = false
 
-    return () => window.clearTimeout(loadProfile)
+    async function load() {
+      const loaded = isSupabaseConfigured
+        ? await fetchProfile(createClient())
+        : null
+
+      if (cancelled) return
+
+      if (loaded) setProfile(loaded)
+      else setError("Could not load your profile.")
+      setMounted(true)
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  function updateProfile(key: keyof ProfileSettings, value: string) {
+  function updateProfile(
+    key: "shopName" | "ownerName" | "phone" | "address",
+    value: string
+  ) {
     setSaved(false)
     setProfile((current) => ({ ...current, [key]: value }))
   }
 
-  function handleSave(event: FormEvent<HTMLFormElement>) {
+  async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    saveStoredProfile(profile)
+    setError("")
+
+    if (profile.age !== null && (profile.age < 13 || profile.age > 120)) {
+      setError("Enter a valid age between 13 and 120.")
+      return
+    }
+
+    setSaving(true)
+
+    const saveError = await saveProfile(createClient(), profile)
+
+    setSaving(false)
+
+    if (saveError) {
+      setSaved(false)
+      setError(saveError)
+      return
+    }
+
     setSaved(true)
   }
 
@@ -121,6 +166,12 @@ export default function ProfilePage() {
 
           <CardContent>
             <form onSubmit={handleSave} className="space-y-4">
+              {error ? (
+                <Alert variant="destructive" className="rounded-xl">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              ) : null}
+
               {saved ? (
                 <Alert className="rounded-xl">
                   <AlertDescription>Profile settings saved.</AlertDescription>
@@ -133,7 +184,6 @@ export default function ProfilePage() {
                 value={profile.shopName}
                 onChange={(value) => updateProfile("shopName", value)}
                 placeholder="Your shop name"
-                icon={<IconShoppingBag className="size-5 text-muted-foreground" />}
               />
               <TextInput
                 id="ownerName"
@@ -141,15 +191,14 @@ export default function ProfilePage() {
                 value={profile.ownerName}
                 onChange={(value) => updateProfile("ownerName", value)}
                 placeholder="Owner name"
-                icon={<IconUser className="size-5 text-muted-foreground" />}
               />
               <TextInput
                 id="email"
                 label="Email"
                 value={profile.email}
-                onChange={(value) => updateProfile("email", value)}
-                placeholder="you@example.com"
+                onChange={() => {}}
                 type="email"
+                disabled
               />
               <TextInput
                 id="phone"
@@ -159,6 +208,48 @@ export default function ProfilePage() {
                 placeholder="Phone number"
                 type="tel"
               />
+              <div className="grid grid-cols-2 gap-3">
+                <TextInput
+                  id="age"
+                  label="Age"
+                  value={profile.age === null ? "" : String(profile.age)}
+                  onChange={(value) => {
+                    setSaved(false)
+                    setProfile((current) => ({
+                      ...current,
+                      age: value === "" ? null : Number(value),
+                    }))
+                  }}
+                  placeholder="Age"
+                  type="number"
+                />
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Gender</Label>
+                  <Select
+                    value={profile.gender || "unset"}
+                    onValueChange={(value) => {
+                      setSaved(false)
+                      setProfile((current) => ({
+                        ...current,
+                        gender: (value === "unset" ? "" : value) as ProfileGender,
+                      }))
+                    }}
+                  >
+                    <SelectTrigger id="gender" className="h-12 w-full rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unset">Not set</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="prefer_not_to_say">
+                        Prefer not to say
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
                 <Textarea
@@ -169,9 +260,22 @@ export default function ProfilePage() {
                   className="min-h-24 rounded-xl text-base"
                 />
               </div>
-              <Button type="submit" className="h-12 w-full rounded-xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={profile.plan === "pro" ? "default" : "secondary"}>
+                  {profile.plan === "pro" ? "Pro plan" : "Free plan"}
+                </Badge>
+                <Badge variant="outline" className="capitalize">
+                  {profile.role}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Managers on the Pro plan read order screenshots with Gemini.
+                Everyone else reads them on this device. Plan and role are set
+                by an admin.
+              </p>
+              <Button type="submit" className="h-12 w-full rounded-xl" disabled={saving}>
                 <IconDeviceFloppy className="mr-2 size-5" />
-                Save Settings
+                {saving ? "Saving..." : "Save Settings"}
               </Button>
             </form>
           </CardContent>
@@ -190,7 +294,7 @@ function TextInput({
   onChange,
   placeholder,
   type = "text",
-  icon,
+  disabled,
 }: {
   id: string
   label: string
@@ -198,17 +302,12 @@ function TextInput({
   onChange: (value: string) => void
   placeholder?: string
   type?: string
-  icon?: React.ReactNode
+  disabled?: boolean
 }) {
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        {icon ? (
-          <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
-            {icon}
-          </div>
-        ) : null}
+      <div>
         <Input
           id={id}
           type={type}
@@ -216,7 +315,8 @@ function TextInput({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className={icon ? "h-12 rounded-xl pl-10 text-base" : "h-12 rounded-xl text-base"}
+          disabled={disabled}
+          className="h-12 rounded-xl text-base"
         />
       </div>
     </div>

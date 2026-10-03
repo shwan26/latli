@@ -8,6 +8,7 @@ import {
   IconAlertCircle,
   IconArrowBackUp,
   IconChartBar,
+  IconBox,
   IconCircleCheck,
   IconPackage,
   IconPlus,
@@ -25,13 +26,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 
-import {
-  getOrdersFromLocalStorage,
-  resetOrdersLocalStorage,
-  type LocalOrder,
-} from "../lib/local-orders"
+import { type LocalOrder } from "../lib/local-orders"
+import { listOrders } from "@/lib/db/orders"
+import { messageOf } from "@/lib/db/shared"
 
 import {
   formatBaht,
@@ -42,39 +42,42 @@ import {
 export default function DashboardPage() {
   const [orders, setOrders] = useState<LocalOrder[]>([])
   const [mounted, setMounted] = useState(false)
+  const [loadError, setLoadError] = useState("")
 
   useEffect(() => {
-    const loadOrders = window.setTimeout(() => {
-      setOrders(getOrdersFromLocalStorage())
-      setMounted(true)
-    }, 0)
+    let cancelled = false
 
-    return () => window.clearTimeout(loadOrders)
+    async function load() {
+      try {
+        const loaded = await listOrders()
+
+        if (!cancelled) setOrders(loaded)
+      } catch (error) {
+        if (!cancelled) setLoadError(messageOf(error, "Could not load orders."))
+      } finally {
+        if (!cancelled) setMounted(true)
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const summary = useMemo(() => {
-    const notBought = orders.filter(
-      (order) =>
-        order.deliveryStatus === "not_arranged" &&
-        order.paymentStatus !== "refunded"
-    )
+    const withStatus = (status: LocalOrder["orderStatus"]) =>
+      orders.filter((order) => order.orderStatus === status)
 
-    const bought = orders.filter(
-      (order) =>
-        order.deliveryStatus === "product_bought" ||
-        order.deliveryStatus === "waiting_pickup"
+    // Refunded orders are not waiting to be bought.
+    const notBought = withStatus("not_bought").filter(
+      (order) => order.paymentStatus !== "refunded"
     )
-
-    const withCargo = orders.filter(
-      (order) =>
-        order.deliveryStatus === "sent_to_cargo" ||
-        order.deliveryStatus === "in_transit" ||
-        order.deliveryStatus === "picked_up"
-    )
-
-    const complete = orders.filter(
-      (order) => order.deliveryStatus === "delivered"
-    )
+    const bought = withStatus("bought")
+    const sentCargo = withStatus("sent_cargo")
+    const delivered = withStatus("delivered")
+    const complete = withStatus("complete")
 
     const unpaid = orders.filter(
       (order) =>
@@ -135,7 +138,8 @@ export default function DashboardPage() {
     return {
       notBoughtCount: notBought.length,
       boughtCount: bought.length,
-      withCargoCount: withCargo.length,
+      sentCargoCount: sentCargo.length,
+      deliveredCount: delivered.length,
       completeCount: complete.length,
       unpaidCount: unpaid.length,
       refundCount: refunded.length,
@@ -151,11 +155,6 @@ export default function DashboardPage() {
       refundMmk: sum(refunded, withRate(refundThb)),
     }
   }, [orders])
-
-  function resetDemoData() {
-    const orders = resetOrdersLocalStorage()
-    setOrders(orders)
-  }
 
   if (!mounted) {
     return (
@@ -187,6 +186,12 @@ export default function DashboardPage() {
       </header>
 
       <div className="mx-auto w-full max-w-md space-y-5 px-5 py-5">
+        {loadError ? (
+          <Alert variant="destructive" className="rounded-xl">
+            <AlertDescription>{loadError}</AlertDescription>
+          </Alert>
+        ) : null}
+
         <section className="space-y-3">
           <h2 className="font-heading text-lg font-medium">Orders</h2>
 
@@ -203,21 +208,24 @@ export default function DashboardPage() {
             />
             <StatusMiniCard
               title="With cargo"
-              value={summary.withCargoCount}
+              value={summary.sentCargoCount}
               icon={IconTruckDelivery}
+            />
+            <StatusMiniCard
+              title="Delivered"
+              value={summary.deliveredCount}
+              icon={IconBox}
             />
             <StatusMiniCard
               title="Complete"
               value={summary.completeCount}
               icon={IconCircleCheck}
             />
-            <div className="col-span-2">
-              <StatusMiniCard
-                title="Unpaid"
-                value={summary.unpaidCount}
-                icon={IconAlertCircle}
-              />
-            </div>
+            <StatusMiniCard
+              title="Unpaid"
+              value={summary.unpaidCount}
+              icon={IconAlertCircle}
+            />
           </div>
         </section>
 
@@ -239,7 +247,7 @@ export default function DashboardPage() {
               <div className="rounded-2xl bg-muted p-4">
                 <p className="text-sm font-medium">No orders waiting to buy</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  New customer orders with delivery status Not Arranged will show here.
+                  New customer orders with status Not bought will show here.
                 </p>
               </div>
             ) : (
@@ -313,14 +321,6 @@ export default function DashboardPage() {
           />
         </section>
 
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 w-full rounded-xl"
-          onClick={resetDemoData}
-        >
-          Reset demo local data
-        </Button>
       </div>
 
       <BottomNavigation active="dashboard" />

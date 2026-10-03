@@ -2,12 +2,13 @@
 
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   IconArrowLeft,
+  IconBuildingStore,
   IconCamera,
   IconDeviceFloppy,
   IconMessage2,
@@ -16,6 +17,10 @@ import {
   IconUser,
 } from "@tabler/icons-react"
 
+import { SearchPicker } from "@/components/search-picker"
+import { canUseGemini, fetchProfile } from "@/lib/profile"
+import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { createClient } from "@/lib/supabase/client"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -36,99 +41,48 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 
-type Currency = "THB" | "MMK"
+import { resizeImageToDataUrl } from "../../lib/image-resize"
+import { readOrderWithOcr } from "../../lib/screenshot-ocr"
+import {
+  buildCustomerSummaries,
+  findMatchingCustomer,
+  getCustomerKey,
+  type CustomerSummary,
+} from "../../lib/local-customers"
+import {
+  ORDER_STATUS_LABELS,
+  ORDER_STATUSES,
+  PAYMENT_STATUS_LABELS,
+  PAYMENT_STATUSES,
+  type OrderStatus,
+  type PaymentStatus,
+} from "../../lib/local-orders"
+import { type LocalShop } from "../../lib/local-shops"
+import {
+  insertCustomer,
+  listCustomers,
+  type CustomerInput,
+} from "@/lib/db/customers"
+import { insertOrder, listOrders } from "@/lib/db/orders"
+import { removePhotos, uploadPhoto } from "@/lib/db/photos"
+import { messageOf } from "@/lib/db/shared"
+import { insertShop, listShops, type ShopInput } from "@/lib/db/shops"
 
-type LocalOrder = {
-  id: string
-  orderNumber: string
+type PickMode = "existing" | "new"
+
+type ExtractedOrder = {
   customerName: string
-
-  orderStatus:
-    | "new_order"
-    | "waiting_deposit"
-    | "deposit_paid"
-    | "ordered_from_retailer"
-    | "received_from_retailer"
-    | "sent_to_cargo"
-    | "in_delivery"
-    | "delivered"
-    | "completed"
-    | "cancelled"
-
-  paymentStatus:
-    | "not_paid"
-    | "receiving"
-    | "deposit_paid"
-    | "partially_paid"
-    | "fully_paid"
-    | "refunded"
-
-  deliveryStatus:
-    | "not_arranged"
-    | "product_bought"
-    | "waiting_pickup"
-    | "picked_up"
-    | "sent_to_cargo"
-    | "in_transit"
-    | "delivered"
-    | "delayed"
-    | "returned"
-
-  baseCurrency: "THB"
-  customerCurrency: Currency
-  exchangeRateThbToMmk: number
-
-  totalRetailerCostThb: number
-  totalCustomerPayableThb: number
-  totalPaidThb: number
-  remainingBalanceThb: number
-  profitThb: number
-
-  createdAt: string
-
-  facebookName?: string
-  phone?: string
-  address?: string
-
-  sourceType?: string
-  customerMessageBurmese?: string
-  productSize?: string
-  productColor?: string
-  productDescription?: string
-  productPhotoName?: string
-  productPhotoDataUrl?: string
-  orderScreenshotName?: string
-  orderScreenshotDataUrl?: string
-
-  productName?: string
-  productOption?: string
-  quantity?: number
-  productNote?: string
-
-  retailerUnitPriceThb?: number
-  sellingUnitPriceThb?: number
-}
-
-const LOCAL_STORAGE_KEY = "latli_orders"
-
-function getStoredOrders(): LocalOrder[] {
-  if (typeof window === "undefined") return []
-
-  const stored = window.localStorage.getItem(LOCAL_STORAGE_KEY)
-
-  if (!stored) {
-    return []
-  }
-
-  try {
-    return JSON.parse(stored) as LocalOrder[]
-  } catch {
-    return []
-  }
-}
-
-function createOrderNumber(orderCount: number) {
-  return `ORD-${String(orderCount + 1).padStart(4, "0")}`
+  facebookName: string
+  phone: string
+  address: string
+  otherContacts: string
+  productName: string
+  productDescription: string
+  productSize: string
+  productColor: string
+  quantity: number
+  sellingPriceThb: number
+  customerMessage: string
 }
 
 function toNumber(value: string) {
@@ -159,131 +113,6 @@ type ImageBounds = {
   top: number
   width: number
   height: number
-}
-
-type ScreenshotExtraction = {
-  customerName: string
-  productSize: string
-  productColor: string
-  customerMessage: string
-  productPhotoDataUrl: string
-  ocrText: string
-}
-
-const colorWords = [
-  "black",
-  "white",
-  "red",
-  "blue",
-  "green",
-  "yellow",
-  "pink",
-  "purple",
-  "brown",
-  "gray",
-  "grey",
-  "beige",
-  "cream",
-  "navy",
-  "orange",
-]
-
-const ignoredNameLines = [
-  "intake",
-  "active now",
-  "reply",
-  "suggested",
-  "create order",
-  "mark as lead",
-  "hello",
-  "min thuka",
-]
-
-const myanmarDigits: Record<string, string> = {
-  "၀": "0",
-  "၁": "1",
-  "၂": "2",
-  "၃": "3",
-  "၄": "4",
-  "၅": "5",
-  "၆": "6",
-  "၇": "7",
-  "၈": "8",
-  "၉": "9",
-}
-
-function normalizeDigits(value: string) {
-  return value.replace(/[၀-၉]/g, (digit) => myanmarDigits[digit] ?? digit)
-}
-
-function normalizeOcrLine(value: string) {
-  return normalizeDigits(value)
-    .replace(/[|_*~]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
-function parseCustomerName(text: string) {
-  const lines = text
-    .split(/\n+/)
-    .map(normalizeOcrLine)
-    .filter(Boolean)
-
-  const nameLine = lines.find((line) => {
-    const lower = line.toLowerCase()
-    const hasLetters = /[a-z]/i.test(line)
-    const hasMostlyNameChars = /^[a-z .'-]+$/i.test(line)
-    const isIgnored = ignoredNameLines.some((word) => lower.includes(word))
-    const isStatusLine = /\b\d{1,2}[:.]\d{2}\b|[0-9]{2,}|pm|am|lte|5g|4g/i.test(
-      line
-    )
-
-    return hasLetters && hasMostlyNameChars && !isIgnored && !isStatusLine
-  })
-
-  return nameLine?.replace(/\s+\.+$/, "...") ?? ""
-}
-
-function parseSizeAndColor(text: string) {
-  const normalized = normalizeDigits(text).replace(/\s+/g, " ")
-  const colorSizeMatch = normalized.match(
-    /\b(black|white|red|blue|green|yellow|pink|purple|brown|gr[ae]y|beige|cream|navy|orange)\s*[-:/]?\s*(\d{2}|xxxl|xxl|xl|xs|s|m|l)\b/i
-  )
-
-  if (colorSizeMatch) {
-    return {
-      productColor: toTitleCase(colorSizeMatch[1]),
-      productSize: colorSizeMatch[2].toUpperCase(),
-    }
-  }
-
-  const explicitSizeMatch = normalized.match(
-    /(?:size|ဆိုဒ်)\s*[:.\-]?\s*(\d{2}|xxxl|xxl|xl|xs|s|m|l)|(\d{2}|xxxl|xxl|xl|xs|s|m|l)\s*[:.\-]?\s*(?:size|ဆိုဒ်)/i
-  )
-  const colorMatch = normalized.match(
-    new RegExp(`\\b(${colorWords.join("|")})\\b`, "i")
-  )
-  const productSize = explicitSizeMatch
-    ? (explicitSizeMatch[1] || explicitSizeMatch[2]).toUpperCase()
-    : ""
-
-  return {
-    productColor: colorMatch ? toTitleCase(colorMatch[1]) : "",
-    productSize,
-  }
-}
-
-function toTitleCase(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
-}
-
-function parseCustomerMessage(text: string) {
-  return text
-    .split(/\n+/)
-    .map(normalizeOcrLine)
-    .filter((line) => /[\u1000-\u109f]/.test(line))
-    .slice(-3)
-    .join("\n")
 }
 
 function getImageElement(dataUrl: string) {
@@ -459,86 +288,52 @@ function findLikelyProductBounds(image: HTMLImageElement): ImageBounds {
   }
 }
 
-async function extractScreenshotOrderData(
-  file: File,
-  dataUrl: string,
-  onProgress: (message: string) => void
-): Promise<ScreenshotExtraction> {
-  const image = await getImageElement(dataUrl)
-  const productBounds = findLikelyProductBounds(image)
-  const productPhotoDataUrl = getImageDataUrl(image, productBounds) || dataUrl
-  const { createWorker, PSM } = await import("tesseract.js")
-  const workerOptions = {
-    logger: (message: { status?: string; progress?: number }) => {
-      if (message.status) {
-        onProgress(
-          `${message.status}${message.progress ? ` ${Math.round(message.progress * 100)}%` : ""}`
-        )
-      }
-    },
-  }
-  let worker: Awaited<ReturnType<typeof createWorker>>
+async function readOrderWithGemini(file: File): Promise<ExtractedOrder> {
+  // A chat screenshot needs more detail than a product thumbnail.
+  const image = await resizeImageToDataUrl(file, 1600, 0.8)
 
-  try {
-    worker = await createWorker("eng+mya", 1, workerOptions)
-  } catch {
-    worker = await createWorker("eng", 1, workerOptions)
+  const response = await fetch("/api/extract-order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image }),
+  })
+
+  const result = (await response.json().catch(() => null)) as {
+    data?: ExtractedOrder
+    error?: string
+  } | null
+
+  if (!response.ok || !result?.data) {
+    throw new Error(result?.error || "Gemini could not read this image.")
   }
 
-  try {
-    await worker.setParameters({
-      preserve_interword_spaces: "1",
-      tessedit_pageseg_mode: PSM.SPARSE_TEXT,
-    })
-
-    onProgress("Reading customer name...")
-    const nameResult = await worker.recognize(file, {
-      rectangle: {
-        left: Math.round(image.naturalWidth * 0.12),
-        top: Math.round(image.naturalHeight * 0.04),
-        width: Math.round(image.naturalWidth * 0.76),
-        height: Math.round(image.naturalHeight * 0.22),
-      },
-    })
-
-    onProgress("Reading order details...")
-    const detailResult = await worker.recognize(file, {
-      rectangle: {
-        left: Math.round(image.naturalWidth * 0.15),
-        top: Math.round(image.naturalHeight * 0.28),
-        width: Math.round(image.naturalWidth * 0.82),
-        height: Math.round(image.naturalHeight * 0.5),
-      },
-    })
-    const fullResult = await worker.recognize(file)
-    const fullText = fullResult.data.text
-    const detailText = detailResult.data.text
-    const details = parseSizeAndColor(`${detailText}\n${fullText}`)
-
-    return {
-      customerName: parseCustomerName(nameResult.data.text || fullText),
-      productSize: details.productSize,
-      productColor: details.productColor,
-      customerMessage: parseCustomerMessage(fullText),
-      productPhotoDataUrl,
-      ocrText: `${detailText}\n${fullText}`.trim(),
-    }
-  } finally {
-    await worker.terminate()
-  }
+  return result.data
 }
 
 export default function CreateOrderPage() {
   const router = useRouter()
   const extractionIdRef = useRef(0)
+  const customerTouchedRef = useRef(false)
 
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
 
+  const [customers, setCustomers] = useState<CustomerSummary[]>([])
+  const [customerMode, setCustomerMode] = useState<PickMode>("existing")
+  const [selectedCustomerKey, setSelectedCustomerKey] = useState("")
   const [customerName, setCustomerName] = useState("")
   const [facebookName, setFacebookName] = useState("")
   const [phone, setPhone] = useState("")
   const [location, setLocation] = useState("")
+  const [otherContacts, setOtherContacts] = useState("")
+
+  const [shops, setShops] = useState<LocalShop[]>([])
+  const [shopMode, setShopMode] = useState<PickMode>("existing")
+  const [selectedShopId, setSelectedShopId] = useState("")
+  const [newShopName, setNewShopName] = useState("")
+  const [newShopPhone, setNewShopPhone] = useState("")
+  const [newShopLocation, setNewShopLocation] = useState("")
+
   const [productName, setProductName] = useState("")
   const [productSize, setProductSize] = useState("")
   const [productColor, setProductColor] = useState("")
@@ -547,15 +342,108 @@ export default function CreateOrderPage() {
   const [costPriceThb, setCostPriceThb] = useState("")
   const [sellingPriceThb, setSellingPriceThb] = useState("")
   const [customerMessage, setCustomerMessage] = useState("")
-  const [paymentStatus, setPaymentStatus] =
-    useState<LocalOrder["paymentStatus"]>("not_paid")
-  const [deliveryStatus, setDeliveryStatus] =
-    useState<LocalOrder["deliveryStatus"]>("not_arranged")
+
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("not_paid")
+  const [orderStatus, setOrderStatus] = useState<OrderStatus>("not_bought")
+  const [amountPaidThb, setAmountPaidThb] = useState("")
+
   const [productPhotoFile, setProductPhotoFile] = useState<File | null>(null)
   const [productPhotoPreview, setProductPhotoPreview] = useState("")
   const [orderScreenshotPreview, setOrderScreenshotPreview] = useState("")
-  const [ocrStatus, setOcrStatus] = useState("")
-  const [ocrText, setOcrText] = useState("")
+  const [readStatus, setReadStatus] = useState("")
+  const [useGemini, setUseGemini] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadRecords() {
+      try {
+        const [savedCustomers, orders, loadedShops] = await Promise.all([
+          listCustomers(),
+          listOrders(),
+          listShops(),
+        ])
+
+        if (cancelled) return
+
+        const loadedCustomers = buildCustomerSummaries(savedCustomers, orders)
+
+        setCustomers(loadedCustomers)
+        setShops(loadedShops)
+
+        // With nothing saved yet, go straight to the new-record form.
+        if (loadedCustomers.length === 0) setCustomerMode("new")
+        if (loadedShops.length === 0) setShopMode("new")
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(messageOf(loadError, "Could not load your customers and shops."))
+        }
+      }
+    }
+
+    // Plan and role come from the signed-in profile. The server checks them
+    // again before it calls Gemini.
+    async function loadProfile() {
+      const profile = isSupabaseConfigured
+        ? await fetchProfile(createClient())
+        : null
+
+      if (!cancelled && profile) setUseGemini(canUseGemini(profile))
+    }
+
+    void loadRecords()
+    void loadProfile()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const selectedCustomer = customers.find(
+    (customer) => customer.key === selectedCustomerKey
+  )
+
+  function chooseCustomerMode(mode: PickMode) {
+    customerTouchedRef.current = true
+    setCustomerMode(mode)
+  }
+
+  function chooseCustomer(key: string) {
+    customerTouchedRef.current = true
+    setSelectedCustomerKey(key)
+  }
+
+  function applyExtraction(data: ExtractedOrder) {
+    setCustomerName((value) => value || data.customerName)
+    setFacebookName((value) => value || data.facebookName || data.customerName)
+    setPhone((value) => value || data.phone)
+    setLocation((value) => value || data.address)
+    setOtherContacts((value) => value || data.otherContacts)
+    setProductName((value) => value || data.productName)
+    setProductDescription((value) => value || data.productDescription)
+    setProductSize((value) => value || data.productSize)
+    setProductColor((value) => value || data.productColor)
+    setCustomerMessage((value) => value || data.customerMessage)
+    if (data.quantity > 1) setQuantity(String(data.quantity))
+    setSellingPriceThb(
+      (value) =>
+        value || (data.sellingPriceThb ? String(data.sellingPriceThb) : "")
+    )
+
+    const match = findMatchingCustomer(customers, {
+      name: data.customerName,
+      facebookName: data.facebookName || data.customerName,
+      phone: data.phone,
+    })
+
+    if (match && !customerTouchedRef.current) {
+      setSelectedCustomerKey(match.key)
+      setCustomerMode("existing")
+      return `Matched saved customer ${match.name}.`
+    }
+
+    return ""
+  }
 
   async function handleProductPhotoChange(
     event: React.ChangeEvent<HTMLInputElement>
@@ -568,12 +456,9 @@ export default function CreateOrderPage() {
     setProductPhotoFile(file)
     setProductPhotoPreview("")
     setOrderScreenshotPreview("")
-    setOcrStatus("")
-    setOcrText("")
+    setReadStatus("")
 
-    if (!file) {
-      return
-    }
+    if (!file) return
 
     if (!file.type.startsWith("image/")) {
       setError("Please upload a product photo.")
@@ -582,56 +467,89 @@ export default function CreateOrderPage() {
       return
     }
 
-    try {
-      const screenshotDataUrl = await readFileAsDataUrl(file)
-      setOrderScreenshotPreview(screenshotDataUrl)
-      setProductPhotoPreview(screenshotDataUrl)
-      setOcrStatus("Preparing screenshot...")
+    let screenshotDataUrl = ""
 
-      const extraction = await extractScreenshotOrderData(
-        file,
-        screenshotDataUrl,
-        (message) => {
-          if (extractionIdRef.current === extractionId) {
-            setOcrStatus(message)
-          }
-        }
-      )
+    try {
+      screenshotDataUrl = await readFileAsDataUrl(file)
+    } catch {
+      setError("Could not preview the product photo. Please choose another image.")
+      setProductPhotoFile(null)
+      event.target.value = ""
+      return
+    }
+
+    setOrderScreenshotPreview(screenshotDataUrl)
+    setProductPhotoPreview(screenshotDataUrl)
+
+    try {
+      const image = await getImageElement(screenshotDataUrl)
 
       if (extractionIdRef.current !== extractionId) return
 
-      setProductPhotoPreview(extraction.productPhotoDataUrl)
-      setOcrText(extraction.ocrText)
-      setCustomerName((value) => value || extraction.customerName)
-      setFacebookName((value) => value || extraction.customerName)
-      setProductSize((value) => value || extraction.productSize)
-      setProductColor((value) => value || extraction.productColor)
-      setCustomerMessage((value) => value || extraction.customerMessage)
-      setProductDescription((value) => {
-        if (value) return value
-
-        const parts = [
-          extraction.productColor && `Color: ${extraction.productColor}`,
-          extraction.productSize && `Size: ${extraction.productSize}`,
-        ].filter(Boolean)
-
-        return parts.join("\n")
-      })
-      setOcrStatus("Screenshot details filled. Please review before saving.")
+      setProductPhotoPreview(
+        getImageDataUrl(image, findLikelyProductBounds(image)) ||
+          screenshotDataUrl
+      )
     } catch {
-      try {
-        const screenshotDataUrl = await readFileAsDataUrl(file)
-        if (extractionIdRef.current !== extractionId) return
-        setOrderScreenshotPreview(screenshotDataUrl)
-        setProductPhotoPreview(screenshotDataUrl)
-        setOcrStatus(
-          "Could not read screenshot automatically. You can fill the fields manually."
-        )
-      } catch {
-        setError("Could not preview the product photo. Please choose another image.")
-        setProductPhotoFile(null)
-        event.target.value = ""
+      // The full screenshot stays as the product photo.
+    }
+
+    // Managers on the Pro plan use Gemini. Everyone else reads on the device.
+    const withGemini = useGemini
+
+    setReadStatus(
+      withGemini
+        ? "Reading the screenshot with Gemini..."
+        : "Reading the screenshot on this device..."
+    )
+
+    try {
+      let data: ExtractedOrder
+
+      if (withGemini) {
+        data = await readOrderWithGemini(file)
+      } else {
+        const ocr = await readOrderWithOcr(file, screenshotDataUrl, (message) => {
+          if (extractionIdRef.current === extractionId) setReadStatus(message)
+        })
+
+        data = {
+          customerName: ocr.customerName,
+          facebookName: ocr.customerName,
+          phone: "",
+          address: "",
+          otherContacts: "",
+          productName: "",
+          productDescription: [
+            ocr.productColor && `Color: ${ocr.productColor}`,
+            ocr.productSize && `Size: ${ocr.productSize}`,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          productSize: ocr.productSize,
+          productColor: ocr.productColor,
+          quantity: 1,
+          sellingPriceThb: 0,
+          customerMessage: ocr.customerMessage,
+        }
       }
+
+      if (extractionIdRef.current !== extractionId) return
+
+      const matchMessage = applyExtraction(data)
+
+      setReadStatus(
+        `Details filled${withGemini ? " by Gemini" : ""}. ${matchMessage} Please review before saving.`.replace(
+          "  ",
+          " "
+        )
+      )
+    } catch (caught) {
+      if (extractionIdRef.current !== extractionId) return
+
+      setReadStatus(
+        `${caught instanceof Error ? caught.message : "Could not read this screenshot."} You can fill the fields manually.`
+      )
     }
   }
 
@@ -652,6 +570,71 @@ export default function CreateOrderPage() {
       return
     }
 
+    // Customer: a saved one, or a new one that is saved with the order.
+    let customer: {
+      name: string
+      facebookName: string
+      phone: string
+      address: string
+    }
+    let newCustomer: CustomerInput | null = null
+
+    if (customerMode === "existing") {
+      if (!selectedCustomer) {
+        setError("Choose a customer, or switch to New customer.")
+        return
+      }
+
+      customer = {
+        name: selectedCustomer.name,
+        facebookName: selectedCustomer.facebookName,
+        phone: selectedCustomer.phone,
+        address: selectedCustomer.address,
+      }
+    } else {
+      if (!customerName.trim()) {
+        setError("Customer name is required.")
+        return
+      }
+
+      customer = {
+        name: customerName.trim(),
+        facebookName: facebookName.trim(),
+        phone: phone.trim(),
+        address: location.trim(),
+      }
+      newCustomer = { ...customer, otherContacts: otherContacts.trim() }
+    }
+
+    // Shop: optional. A saved one, a new one, or none yet.
+    let shopName = ""
+    let newShop: ShopInput | null = null
+
+    if (shopMode === "existing") {
+      shopName = shops.find((shop) => shop.id === selectedShopId)?.name ?? ""
+    } else if (newShopName.trim()) {
+      shopName = newShopName.trim()
+
+      const sameName = shops.find(
+        (shop) => shop.name.trim().toLowerCase() === shopName.toLowerCase()
+      )
+
+      if (sameName) {
+        shopName = sameName.name
+      } else {
+        newShop = {
+          name: shopName,
+          ownerName: "",
+          phone: newShopPhone.trim(),
+          location: newShopLocation.trim(),
+          note: "",
+        }
+      }
+    } else if (newShopPhone.trim() || newShopLocation.trim()) {
+      setError("Enter the new shop's name, or clear its details.")
+      return
+    }
+
     if (!trimmedSize) {
       setError("Product size is required.")
       return
@@ -664,28 +647,53 @@ export default function CreateOrderPage() {
 
     setSaving(true)
 
+    const uploadedPaths: string[] = []
+
     try {
-      const existingOrders = getStoredOrders()
-      const productPhotoDataUrl =
-        productPhotoPreview || (await readFileAsDataUrl(productPhotoFile))
-      const orderScreenshotDataUrl =
-        orderScreenshotPreview || productPhotoDataUrl
+      // Photos go to Supabase Storage. A cropped product photo is saved next
+      // to the full screenshot. Without a crop, one resized copy is saved.
+      const hasCrop =
+        productPhotoPreview !== "" && productPhotoPreview !== orderScreenshotPreview
+
+      const productPhotoPath = await uploadPhoto(
+        hasCrop
+          ? productPhotoPreview
+          : await resizeImageToDataUrl(productPhotoFile, 1600, 0.8),
+        "orders"
+      )
+
+      uploadedPaths.push(productPhotoPath)
+
+      let orderScreenshotPath: string | undefined
+
+      if (hasCrop) {
+        orderScreenshotPath = await uploadPhoto(
+          await resizeImageToDataUrl(productPhotoFile, 1600, 0.8),
+          "orders"
+        )
+        uploadedPaths.push(orderScreenshotPath)
+      }
 
       const totalRetailerCostThb = costPriceNumber * quantityNumber
       const totalCustomerPayableThb = sellingPriceNumber * quantityNumber
 
-      const newOrder: LocalOrder = {
-        id:
-          typeof crypto !== "undefined" && "randomUUID" in crypto
-            ? crypto.randomUUID()
-            : `${Date.now()}`,
+      const totalPaidThb =
+        paymentStatus === "fully_paid" || paymentStatus === "refunded"
+          ? totalCustomerPayableThb
+          : paymentStatus === "partially_paid"
+            ? Math.min(toNumber(amountPaidThb), totalCustomerPayableThb)
+            : 0
+      const remainingBalanceThb =
+        paymentStatus === "refunded"
+          ? 0
+          : Math.max(totalCustomerPayableThb - totalPaidThb, 0)
 
-        orderNumber: createOrderNumber(existingOrders.length),
-        customerName: customerName.trim() || "Customer order",
+      // The order number and dates are set by the database.
+      await insertOrder({
+        customerName: customer.name,
 
-        orderStatus: "new_order",
+        orderStatus,
         paymentStatus,
-        deliveryStatus,
 
         baseCurrency: "THB",
         customerCurrency: "MMK",
@@ -693,15 +701,13 @@ export default function CreateOrderPage() {
 
         totalRetailerCostThb,
         totalCustomerPayableThb,
-        totalPaidThb: 0,
-        remainingBalanceThb: totalCustomerPayableThb,
+        totalPaidThb,
+        remainingBalanceThb,
         profitThb: totalCustomerPayableThb - totalRetailerCostThb,
 
-        createdAt: new Date().toISOString(),
-
-        facebookName: facebookName.trim(),
-        phone: phone.trim(),
-        address: location.trim(),
+        facebookName: customer.facebookName,
+        phone: customer.phone,
+        address: customer.address,
 
         sourceType: "customer_chat",
         customerMessageBurmese: customerMessage.trim(),
@@ -713,27 +719,44 @@ export default function CreateOrderPage() {
         productColor: trimmedColor,
         productDescription: trimmedDescription,
         productNote: trimmedDescription,
+        retailerName: shopName,
         retailerUnitPriceThb: costPriceNumber,
         sellingUnitPriceThb: sellingPriceNumber,
         productPhotoName: productPhotoFile.name,
-        productPhotoDataUrl,
-        orderScreenshotName: productPhotoFile.name,
-        orderScreenshotDataUrl,
-      }
-
-      const updatedOrders = [newOrder, ...existingOrders]
-
-      window.localStorage.setItem(
-        LOCAL_STORAGE_KEY,
-        JSON.stringify(updatedOrders)
-      )
-
-      router.push("/orders")
-    } catch {
-      setError("Could not save order. Please try a smaller product photo.")
-    } finally {
+        productPhotoPath,
+        orderScreenshotPath,
+      })
+    } catch (saveError) {
+      await removePhotos(uploadedPaths)
+      setError(messageOf(saveError, "Could not save the order."))
       setSaving(false)
+      return
     }
+
+    // The order already holds the customer and shop details, so a failure to
+    // save the new records does not undo the order.
+    if (newCustomer) {
+      try {
+        const key = getCustomerKey(newCustomer)
+        const saved = await listCustomers()
+
+        if (!saved.some((item) => getCustomerKey(item) === key)) {
+          await insertCustomer(newCustomer)
+        }
+      } catch {
+        // Ignored on purpose, see above.
+      }
+    }
+
+    if (newShop) {
+      try {
+        await insertShop(newShop)
+      } catch {
+        // Ignored on purpose, see above.
+      }
+    }
+
+    router.push("/orders")
   }
 
   return (
@@ -772,8 +795,9 @@ export default function CreateOrderPage() {
               Product Photo
             </CardTitle>
             <CardDescription>
-              Upload the Messenger screenshot. The product image and customer
-              details will be extracted where possible.
+              {useGemini
+                ? "Upload the Messenger screenshot. Gemini reads the customer, product and message details and fills the form."
+                : "Upload the Messenger screenshot. The product image and customer details are read on this device where possible."}
             </CardDescription>
           </CardHeader>
 
@@ -784,6 +808,10 @@ export default function CreateOrderPage() {
               className="rounded-xl"
               onChange={handleProductPhotoChange}
             />
+            <p className="text-xs text-muted-foreground">
+              Photos are deleted 7 days after you save the order. Pro accounts
+              can keep them for a month from the order page.
+            </p>
 
             {productPhotoPreview ? (
               <div className="space-y-3">
@@ -815,10 +843,10 @@ export default function CreateOrderPage() {
                   </details>
                 ) : null}
 
-                {ocrStatus ? (
+                {readStatus ? (
                   <div className="flex items-start gap-2 rounded-xl border bg-background px-3 py-2 text-sm text-muted-foreground">
                     <IconSparkles className="mt-0.5 size-4 shrink-0" />
-                    <span>{ocrStatus}</span>
+                    <span>{readStatus}</span>
                   </div>
                 ) : null}
               </div>
@@ -837,58 +865,180 @@ export default function CreateOrderPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <IconUser className="size-5 text-muted-foreground" />
-              Customer Info
+              Customer
             </CardTitle>
             <CardDescription>
-              Add these when the customer sends them.
+              Choose a saved customer or add a new one.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="customerName">Customer name</Label>
-              <Input
-                id="customerName"
-                value={customerName}
-                onChange={(event) => setCustomerName(event.target.value)}
-                placeholder="Customer name"
-                className="h-12 rounded-xl text-base"
-              />
-            </div>
+            <ModeToggle
+              value={customerMode}
+              onChange={chooseCustomerMode}
+              existingLabel="Saved customer"
+              newLabel="New customer"
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="facebookName">Facebook name</Label>
-              <Input
-                id="facebookName"
-                value={facebookName}
-                onChange={(event) => setFacebookName(event.target.value)}
-                placeholder="Facebook display name"
-                className="h-12 rounded-xl text-base"
-              />
-            </div>
+            {customerMode === "existing" ? (
+              <div className="space-y-3">
+                <SearchPicker
+                  id="customerPicker"
+                  items={customers.map((customer) => ({
+                    value: customer.key,
+                    label: customer.name,
+                    description:
+                      customer.phone || customer.facebookName || undefined,
+                  }))}
+                  value={selectedCustomerKey}
+                  onChange={chooseCustomer}
+                  placeholder="Choose a customer"
+                  searchPlaceholder="Search name, phone, Facebook"
+                  emptyText="No saved customers match."
+                />
 
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone number</Label>
-              <Input
-                id="phone"
-                inputMode="tel"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                placeholder="Phone number"
-                className="h-12 rounded-xl text-base"
-              />
-            </div>
+                {selectedCustomer ? (
+                  <div className="space-y-1 rounded-2xl bg-muted p-3 text-sm">
+                    {selectedCustomer.facebookName ? (
+                      <p>Facebook: {selectedCustomer.facebookName}</p>
+                    ) : null}
+                    {selectedCustomer.phone ? (
+                      <p>Phone: {selectedCustomer.phone}</p>
+                    ) : null}
+                    {selectedCustomer.address ? (
+                      <p className="whitespace-pre-wrap">
+                        Address: {selectedCustomer.address}
+                      </p>
+                    ) : null}
+                    {!selectedCustomer.facebookName &&
+                    !selectedCustomer.phone &&
+                    !selectedCustomer.address ? (
+                      <p className="text-muted-foreground">
+                        No contact details saved.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <TextField
+                  id="customerName"
+                  label="Customer name"
+                  value={customerName}
+                  onChange={setCustomerName}
+                  placeholder="Customer name"
+                />
+                <TextField
+                  id="facebookName"
+                  label="Facebook name"
+                  value={facebookName}
+                  onChange={setFacebookName}
+                  placeholder="Facebook display name"
+                />
+                <TextField
+                  id="phone"
+                  label="Phone number"
+                  value={phone}
+                  onChange={setPhone}
+                  placeholder="Phone number"
+                  inputMode="tel"
+                />
+                <div className="space-y-2">
+                  <Label htmlFor="location">Address</Label>
+                  <Textarea
+                    id="location"
+                    value={location}
+                    onChange={(event) => setLocation(event.target.value)}
+                    placeholder="Customer delivery address"
+                    className="min-h-24 rounded-xl text-base"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="otherContacts">Other contacts</Label>
+                  <Textarea
+                    id="otherContacts"
+                    value={otherContacts}
+                    onChange={(event) => setOtherContacts(event.target.value)}
+                    placeholder="Viber, Telegram, second phone"
+                    className="min-h-20 rounded-xl text-base"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  The customer is saved to your customer list with this order.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-            <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Textarea
-                id="location"
-                value={location}
-                onChange={(event) => setLocation(event.target.value)}
-                placeholder="Customer delivery location"
-                className="min-h-24 rounded-xl text-base"
+        <Card className="rounded-[20px] shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <IconBuildingStore className="size-5 text-muted-foreground" />
+              Shop
+            </CardTitle>
+            <CardDescription>
+              Optional. Where this product will be bought.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            <ModeToggle
+              value={shopMode}
+              onChange={setShopMode}
+              existingLabel="Saved shop"
+              newLabel="New shop"
+            />
+
+            {shopMode === "existing" ? (
+              <SearchPicker
+                id="shopPicker"
+                items={shops
+                  .slice()
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((shop) => ({
+                    value: shop.id,
+                    label: shop.name,
+                    description: shop.location || undefined,
+                  }))}
+                value={selectedShopId}
+                onChange={setSelectedShopId}
+                placeholder="Choose a shop"
+                searchPlaceholder="Search shop or location"
+                emptyText="No saved shops match."
               />
-            </div>
+            ) : (
+              <div className="space-y-4">
+                <TextField
+                  id="newShopName"
+                  label="Shop name"
+                  value={newShopName}
+                  onChange={setNewShopName}
+                  placeholder="Bangkok shop"
+                />
+                <TextField
+                  id="newShopPhone"
+                  label="Phone or LINE (optional)"
+                  value={newShopPhone}
+                  onChange={setNewShopPhone}
+                  placeholder="Phone number or LINE ID"
+                />
+                <div className="space-y-2">
+                  <Label htmlFor="newShopLocation">Location (optional)</Label>
+                  <Textarea
+                    id="newShopLocation"
+                    value={newShopLocation}
+                    onChange={(event) => setNewShopLocation(event.target.value)}
+                    placeholder="Shop address, mall, or market"
+                    className="min-h-20 rounded-xl text-base"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  The shop is saved to your shop list with this order.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -904,16 +1054,13 @@ export default function CreateOrderPage() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="productName">Product name</Label>
-              <Input
-                id="productName"
-                value={productName}
-                onChange={(event) => setProductName(event.target.value)}
-                placeholder="Nike Air Force 1, dress, bag..."
-                className="h-12 rounded-xl text-base"
-              />
-            </div>
+            <TextField
+              id="productName"
+              label="Product name"
+              value={productName}
+              onChange={setProductName}
+              placeholder="Nike Air Force 1, dress, bag..."
+            />
 
             <div className="space-y-2">
               <Label htmlFor="productDescription">Description</Label>
@@ -927,71 +1074,54 @@ export default function CreateOrderPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="productSize">Size / variant *</Label>
-                <Input
-                  id="productSize"
-                  value={productSize}
-                  onChange={(event) => setProductSize(event.target.value)}
-                  placeholder="XS, 42, L..."
-                  className="h-12 rounded-xl text-base"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="productColor">Color</Label>
-                <Input
-                  id="productColor"
-                  value={productColor}
-                  onChange={(event) => setProductColor(event.target.value)}
-                  placeholder="White, black..."
-                  className="h-12 rounded-xl text-base"
-                />
-              </div>
+              <TextField
+                id="productSize"
+                label="Size / variant *"
+                value={productSize}
+                onChange={setProductSize}
+                placeholder="XS, 42, L..."
+              />
+              <TextField
+                id="productColor"
+                label="Color"
+                value={productColor}
+                onChange={setProductColor}
+                placeholder="White, black..."
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  inputMode="numeric"
-                  min="1"
-                  value={quantity}
-                  onChange={(event) => setQuantity(event.target.value)}
-                  className="h-12 rounded-xl text-base"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="costPriceThb">Cost price (฿)</Label>
-                <Input
-                  id="costPriceThb"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  value={costPriceThb}
-                  onChange={(event) => setCostPriceThb(event.target.value)}
-                  placeholder="0"
-                  className="h-12 rounded-xl text-base"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sellingPriceThb">Selling price (฿)</Label>
-              <Input
-                id="sellingPriceThb"
+              <TextField
+                id="quantity"
+                label="Quantity"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                value={quantity}
+                onChange={setQuantity}
+              />
+              <TextField
+                id="costPriceThb"
+                label="Cost price (฿)"
                 type="number"
                 inputMode="decimal"
                 min="0"
-                value={sellingPriceThb}
-                onChange={(event) => setSellingPriceThb(event.target.value)}
+                value={costPriceThb}
+                onChange={setCostPriceThb}
                 placeholder="0"
-                className="h-12 rounded-xl text-base"
               />
             </div>
+
+            <TextField
+              id="sellingPriceThb"
+              label="Selling price (฿)"
+              type="number"
+              inputMode="decimal"
+              min="0"
+              value={sellingPriceThb}
+              onChange={setSellingPriceThb}
+              placeholder="0"
+            />
 
             <div className="space-y-2">
               <Label htmlFor="customerMessage">Customer note</Label>
@@ -1003,17 +1133,6 @@ export default function CreateOrderPage() {
                 className="min-h-24 rounded-xl text-base"
               />
             </div>
-
-            {ocrText ? (
-              <details className="rounded-xl border bg-background px-3 py-2">
-                <summary className="cursor-pointer text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  OCR text
-                </summary>
-                <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">
-                  {ocrText}
-                </pre>
-              </details>
-            ) : null}
           </CardContent>
         </Card>
 
@@ -1030,50 +1149,52 @@ export default function CreateOrderPage() {
 
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Payment status</Label>
+              <Label htmlFor="paymentStatus">Payment status</Label>
               <Select
                 value={paymentStatus}
-                onValueChange={(value) =>
-                  setPaymentStatus(value as LocalOrder["paymentStatus"])
-                }
+                onValueChange={(value) => setPaymentStatus(value as PaymentStatus)}
               >
-                <SelectTrigger className="h-12 rounded-xl">
+                <SelectTrigger id="paymentStatus" className="h-12 w-full rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="not_paid">Not Paid</SelectItem>
-                  <SelectItem value="receiving">Receiving</SelectItem>
-                  <SelectItem value="deposit_paid">Deposit Paid</SelectItem>
-                  <SelectItem value="partially_paid">Partially Paid</SelectItem>
-                  <SelectItem value="fully_paid">Fully Paid</SelectItem>
-                  <SelectItem value="refunded">Refunded</SelectItem>
+                  {PAYMENT_STATUSES.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {PAYMENT_STATUS_LABELS[key]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
+            {paymentStatus === "partially_paid" ? (
+              <TextField
+                id="amountPaidThb"
+                label="Amount paid so far (฿)"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                value={amountPaidThb}
+                onChange={setAmountPaidThb}
+                placeholder="0"
+              />
+            ) : null}
+
             <div className="space-y-2">
-              <Label>Delivery status</Label>
+              <Label htmlFor="orderStatus">Order status</Label>
               <Select
-                value={deliveryStatus}
-                onValueChange={(value) =>
-                  setDeliveryStatus(value as LocalOrder["deliveryStatus"])
-                }
+                value={orderStatus}
+                onValueChange={(value) => setOrderStatus(value as OrderStatus)}
               >
-                <SelectTrigger className="h-12 rounded-xl">
+                <SelectTrigger id="orderStatus" className="h-12 w-full rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="not_arranged">Not Arranged</SelectItem>
-                  <SelectItem value="product_bought">
-                    Product Already Bought
-                  </SelectItem>
-                  <SelectItem value="waiting_pickup">Waiting Pickup</SelectItem>
-                  <SelectItem value="picked_up">Picked Up</SelectItem>
-                  <SelectItem value="sent_to_cargo">Sent To Cargo</SelectItem>
-                  <SelectItem value="in_transit">In Transit</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="delayed">Delayed</SelectItem>
-                  <SelectItem value="returned">Returned</SelectItem>
+                  {ORDER_STATUSES.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {ORDER_STATUS_LABELS[key]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1098,5 +1219,76 @@ export default function CreateOrderPage() {
         </div>
       </form>
     </main>
+  )
+}
+
+function ModeToggle({
+  value,
+  onChange,
+  existingLabel,
+  newLabel,
+}: {
+  value: PickMode
+  onChange: (value: PickMode) => void
+  existingLabel: string
+  newLabel: string
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <Button
+        type="button"
+        variant={value === "existing" ? "default" : "outline"}
+        className="h-11 rounded-xl"
+        aria-pressed={value === "existing"}
+        onClick={() => onChange("existing")}
+      >
+        {existingLabel}
+      </Button>
+      <Button
+        type="button"
+        variant={value === "new" ? "default" : "outline"}
+        className="h-11 rounded-xl"
+        aria-pressed={value === "new"}
+        onClick={() => onChange("new")}
+      >
+        {newLabel}
+      </Button>
+    </div>
+  )
+}
+
+function TextField({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  inputMode,
+  min,
+}: {
+  id: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  type?: string
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]
+  min?: string
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        type={type}
+        inputMode={inputMode}
+        min={min}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-12 rounded-xl text-base"
+      />
+    </div>
   )
 }
