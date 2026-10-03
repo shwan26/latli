@@ -1,3 +1,4 @@
+import { translate } from "@/lib/i18n/runtime"
 import { createClient } from "@/lib/supabase/client"
 
 export function getDb() {
@@ -8,7 +9,7 @@ type DbError = { message: string } | null | undefined
 
 // Turns a Supabase error into a thrown Error with a readable message.
 export function check(error: DbError, action: string) {
-  if (error) throw new Error(`${action}: ${error.message}`)
+  if (error) throw new Error(`${translate(action)}: ${translate(error.message)}`)
 }
 
 const PAGE_SIZE = 1000
@@ -35,5 +36,7 @@ export async function fetchAllRows<T>(
 }
 
 export function messageOf(error: unknown, fallback = "Something went wrong.") {
-  return error instanceof Error && error.message ? error.message : fallback
+  return error instanceof Error && error.message
+    ? error.message
+    : translate(fallback)
 }

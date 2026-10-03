@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { translate } from "@/lib/i18n/runtime"
+
 export type ProfilePlan = "free" | "pro"
 export type ProfileRole = "owner" | "manager" | "staff"
 export type ProfileGender = "" | "female" | "male" | "other" | "prefer_not_to_say"
@@ -81,7 +83,7 @@ export async function saveProfile(
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return "You are signed out. Log in again."
+  if (!user) return translate("You are signed out. Log in again.")
 
   const { error } = await supabase
     .from("profiles")

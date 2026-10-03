@@ -17,8 +17,11 @@ import {
   IconUser,
 } from "@tabler/icons-react"
 
+import { OrderProductFields, type ProductMode } from "@/components/order-product-fields"
 import { SearchPicker } from "@/components/search-picker"
+import { FieldError, RequiredMark } from "@/components/field-error"
 import { UpgradeLink } from "@/components/upgrade-link"
+import { focusFirstError } from "@/lib/form-errors"
 import { canUseGemini, fetchProfile } from "@/lib/profile"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
@@ -58,16 +61,32 @@ import {
   type OrderStatus,
   type PaymentStatus,
 } from "../../lib/local-orders"
-import { type LocalShop } from "../../lib/local-shops"
+import { type LocalShop, type LocalShopProduct } from "../../lib/local-shops"
 import {
   insertCustomer,
   listCustomers,
   type CustomerInput,
 } from "@/lib/db/customers"
 import { insertOrder, listOrders } from "@/lib/db/orders"
-import { removePhotos, uploadPhoto } from "@/lib/db/photos"
+import { getPhotoUrls, removePhotos, uploadPhoto } from "@/lib/db/photos"
 import { messageOf } from "@/lib/db/shared"
-import { insertShop, listShops, type ShopInput } from "@/lib/db/shops"
+import { insertProduct, insertShop, listShops, type ShopInput } from "@/lib/db/shops"
+import { useI18n } from "@/lib/i18n/provider"
+import { RichText } from "@/components/rich-text"
+import { translate } from "@/lib/i18n/runtime"
+
+// Required fields from top to bottom, for moving to the first problem.
+const FIELD_ORDER = [
+  "customerPicker",
+  "customerName",
+  "shopPicker",
+  "newShopName",
+  "productName",
+  "productSize",
+  "quantity",
+  "costPriceThb",
+  "sellingPriceThb",
+]
 
 type PickMode = "existing" | "new"
 
@@ -101,192 +120,12 @@ function readFileAsDataUrl(file: File) {
         return
       }
 
-      reject(new Error("Invalid image file."))
+      reject(new Error(translate("Invalid image file.")))
     }
 
-    reader.onerror = () => reject(new Error("Could not read image file."))
+    reader.onerror = () => reject(new Error(translate("Could not read image file.")))
     reader.readAsDataURL(file)
   })
-}
-
-type ImageBounds = {
-  left: number
-  top: number
-  width: number
-  height: number
-}
-
-function getImageElement(dataUrl: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new window.Image()
-    image.onload = () => resolve(image)
-    image.onerror = () => reject(new Error("Could not load screenshot."))
-    image.src = dataUrl
-  })
-}
-
-function getImageDataUrl(
-  image: HTMLImageElement,
-  bounds: ImageBounds,
-  type = "image/jpeg",
-  quality = 0.9
-) {
-  const canvas = document.createElement("canvas")
-  const context = canvas.getContext("2d")
-
-  if (!context) return ""
-
-  canvas.width = Math.max(1, Math.round(bounds.width))
-  canvas.height = Math.max(1, Math.round(bounds.height))
-  context.drawImage(
-    image,
-    bounds.left,
-    bounds.top,
-    bounds.width,
-    bounds.height,
-    0,
-    0,
-    canvas.width,
-    canvas.height
-  )
-
-  return canvas.toDataURL(type, quality)
-}
-
-function findLikelyProductBounds(image: HTMLImageElement): ImageBounds {
-  const width = image.naturalWidth
-  const height = image.naturalHeight
-  const canvas = document.createElement("canvas")
-  const context = canvas.getContext("2d", { willReadFrequently: true })
-
-  if (!context) {
-    return {
-      left: Math.round(width * 0.08),
-      top: Math.round(height * 0.16),
-      width: Math.round(width * 0.84),
-      height: Math.round(height * 0.45),
-    }
-  }
-
-  const sampleWidth = 120
-  const sampleHeight = Math.max(160, Math.round((height / width) * sampleWidth))
-  canvas.width = sampleWidth
-  canvas.height = sampleHeight
-  context.drawImage(image, 0, 0, sampleWidth, sampleHeight)
-
-  const imageData = context.getImageData(0, 0, sampleWidth, sampleHeight).data
-  const visited = new Uint8Array(sampleWidth * sampleHeight)
-  const minY = Math.round(sampleHeight * 0.12)
-  const maxY = Math.round(sampleHeight * 0.9)
-  let best = { left: 0, top: 0, right: 0, bottom: 0, area: 0 }
-
-  function isCandidatePixel(x: number, y: number) {
-    const index = (y * sampleWidth + x) * 4
-    const red = imageData[index]
-    const green = imageData[index + 1]
-    const blue = imageData[index + 2]
-    const max = Math.max(red, green, blue)
-    const min = Math.min(red, green, blue)
-
-    if (y < minY || y > maxY) return false
-    if (max > 245 && min > 235) return false
-    if (max < 18 && min < 18) return false
-    if (blue > 170 && red < 90 && green < 160) return false
-
-    return max - min > 10 || max < 225
-  }
-
-  for (let y = minY; y < maxY; y += 1) {
-    for (let x = 0; x < sampleWidth; x += 1) {
-      const start = y * sampleWidth + x
-
-      if (visited[start] || !isCandidatePixel(x, y)) continue
-
-      const queue = [start]
-      visited[start] = 1
-      let pointer = 0
-      let left = x
-      let right = x
-      let top = y
-      let bottom = y
-      let area = 0
-
-      while (pointer < queue.length) {
-        const current = queue[pointer]
-        pointer += 1
-        area += 1
-
-        const currentX = current % sampleWidth
-        const currentY = Math.floor(current / sampleWidth)
-        left = Math.min(left, currentX)
-        right = Math.max(right, currentX)
-        top = Math.min(top, currentY)
-        bottom = Math.max(bottom, currentY)
-
-        const neighbors = [
-          current - 1,
-          current + 1,
-          current - sampleWidth,
-          current + sampleWidth,
-        ]
-
-        for (const next of neighbors) {
-          if (next < 0 || next >= visited.length || visited[next]) continue
-
-          const nextX = next % sampleWidth
-          const nextY = Math.floor(next / sampleWidth)
-          const crossesRow =
-            Math.abs(nextX - currentX) > 1 || Math.abs(nextY - currentY) > 1
-
-          if (crossesRow || !isCandidatePixel(nextX, nextY)) continue
-
-          visited[next] = 1
-          queue.push(next)
-        }
-      }
-
-      const componentWidth = right - left + 1
-      const componentHeight = bottom - top + 1
-      const isLargeEnough = componentWidth > 22 && componentHeight > 22
-      const isTooWideChrome =
-        componentWidth > sampleWidth * 0.92 && componentHeight < 28
-
-      if (isLargeEnough && !isTooWideChrome && area > best.area) {
-        best = { left, top, right, bottom, area }
-      }
-    }
-  }
-
-  if (!best.area) {
-    return {
-      left: Math.round(width * 0.08),
-      top: Math.round(height * 0.16),
-      width: Math.round(width * 0.84),
-      height: Math.round(height * 0.45),
-    }
-  }
-
-  const scaleX = width / sampleWidth
-  const scaleY = height / sampleHeight
-  const paddingX = width * 0.015
-  const paddingY = height * 0.012
-  const left = Math.max(0, Math.floor(best.left * scaleX - paddingX))
-  const top = Math.max(0, Math.floor(best.top * scaleY - paddingY))
-  const right = Math.min(
-    width,
-    Math.ceil((best.right + 1) * scaleX + paddingX)
-  )
-  const bottom = Math.min(
-    height,
-    Math.ceil((best.bottom + 1) * scaleY + paddingY)
-  )
-
-  return {
-    left,
-    top,
-    width: right - left,
-    height: bottom - top,
-  }
 }
 
 async function readOrderWithGemini(file: File): Promise<ExtractedOrder> {
@@ -305,18 +144,22 @@ async function readOrderWithGemini(file: File): Promise<ExtractedOrder> {
   } | null
 
   if (!response.ok || !result?.data) {
-    throw new Error(result?.error || "Gemini could not read this image.")
+    throw new Error(translate(result?.error || "Gemini could not read this image."))
   }
 
   return result.data
 }
 
 export default function CreateOrderPage() {
+  const { t } = useI18n()
+
   const router = useRouter()
   const extractionIdRef = useRef(0)
   const customerTouchedRef = useRef(false)
 
   const [error, setError] = useState("")
+  const [loadError, setLoadError] = useState("")
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
   const [customers, setCustomers] = useState<CustomerSummary[]>([])
@@ -348,9 +191,12 @@ export default function CreateOrderPage() {
   const [orderStatus, setOrderStatus] = useState<OrderStatus>("not_bought")
   const [amountPaidThb, setAmountPaidThb] = useState("")
 
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null)
+  const [screenshotPreview, setScreenshotPreview] = useState("")
+  const [productMode, setProductMode] = useState<ProductMode>("existing")
+  const [selectedProductId, setSelectedProductId] = useState("")
   const [productPhotoFile, setProductPhotoFile] = useState<File | null>(null)
   const [productPhotoPreview, setProductPhotoPreview] = useState("")
-  const [orderScreenshotPreview, setOrderScreenshotPreview] = useState("")
   const [readStatus, setReadStatus] = useState("")
   const [useGemini, setUseGemini] = useState(false)
 
@@ -375,9 +221,9 @@ export default function CreateOrderPage() {
         // With nothing saved yet, go straight to the new-record form.
         if (loadedCustomers.length === 0) setCustomerMode("new")
         if (loadedShops.length === 0) setShopMode("new")
-      } catch (loadError) {
+      } catch (caughtLoadError) {
         if (!cancelled) {
-          setError(messageOf(loadError, "Could not load your customers and shops."))
+          setLoadError(messageOf(caughtLoadError, translate("Could not load your customers and shops.")))
         }
       }
     }
@@ -404,12 +250,26 @@ export default function CreateOrderPage() {
     (customer) => customer.key === selectedCustomerKey
   )
 
+  function clearFieldError(...ids: string[]) {
+    setFieldErrors((current) => {
+      if (!ids.some((id) => current[id])) return current
+
+      const next = { ...current }
+
+      for (const id of ids) delete next[id]
+
+      return next
+    })
+  }
+
   function chooseCustomerMode(mode: PickMode) {
+    clearFieldError("customerPicker", "customerName")
     customerTouchedRef.current = true
     setCustomerMode(mode)
   }
 
   function chooseCustomer(key: string) {
+    clearFieldError("customerPicker")
     customerTouchedRef.current = true
     setSelectedCustomerKey(key)
   }
@@ -440,13 +300,13 @@ export default function CreateOrderPage() {
     if (match && !customerTouchedRef.current) {
       setSelectedCustomerKey(match.key)
       setCustomerMode("existing")
-      return `Matched saved customer ${match.name}.`
+      return t("Matched saved customer {name}.", { name: match.name })
     }
 
     return ""
   }
 
-  async function handleProductPhotoChange(
+  async function handleScreenshotChange(
     event: React.ChangeEvent<HTMLInputElement>
   ) {
     setError("")
@@ -454,16 +314,15 @@ export default function CreateOrderPage() {
     const file = event.target.files?.[0] ?? null
     const extractionId = extractionIdRef.current + 1
     extractionIdRef.current = extractionId
-    setProductPhotoFile(file)
-    setProductPhotoPreview("")
-    setOrderScreenshotPreview("")
+    setScreenshotFile(file)
+    setScreenshotPreview("")
     setReadStatus("")
 
     if (!file) return
 
     if (!file.type.startsWith("image/")) {
-      setError("Please upload a product photo.")
-      setProductPhotoFile(null)
+      setError(t("Please upload an image."))
+      setScreenshotFile(null)
       event.target.value = ""
       return
     }
@@ -473,35 +332,21 @@ export default function CreateOrderPage() {
     try {
       screenshotDataUrl = await readFileAsDataUrl(file)
     } catch {
-      setError("Could not preview the product photo. Please choose another image.")
-      setProductPhotoFile(null)
+      setError(t("Could not preview the image. Please choose another image."))
+      setScreenshotFile(null)
       event.target.value = ""
       return
     }
 
-    setOrderScreenshotPreview(screenshotDataUrl)
-    setProductPhotoPreview(screenshotDataUrl)
-
-    try {
-      const image = await getImageElement(screenshotDataUrl)
-
-      if (extractionIdRef.current !== extractionId) return
-
-      setProductPhotoPreview(
-        getImageDataUrl(image, findLikelyProductBounds(image)) ||
-          screenshotDataUrl
-      )
-    } catch {
-      // The full screenshot stays as the product photo.
-    }
+    setScreenshotPreview(screenshotDataUrl)
 
     // Managers on the Pro plan use Gemini. Everyone else reads on the device.
     const withGemini = useGemini
 
     setReadStatus(
       withGemini
-        ? "Reading the screenshot with Gemini..."
-        : "Reading the screenshot on this device..."
+        ? t("Reading the screenshot with Gemini...")
+        : t("Reading the screenshot on this device...")
     )
 
     try {
@@ -540,18 +385,76 @@ export default function CreateOrderPage() {
       const matchMessage = applyExtraction(data)
 
       setReadStatus(
-        `Details filled${withGemini ? " by Gemini" : ""}. ${matchMessage} Please review before saving.`.replace(
-          "  ",
-          " "
-        )
+        [
+          withGemini ? t("Details filled by Gemini.") : t("Details filled."),
+          matchMessage,
+          t("Please review before saving."),
+        ]
+          .filter(Boolean)
+          .join(" ")
       )
     } catch (caught) {
       if (extractionIdRef.current !== extractionId) return
 
       setReadStatus(
-        `${caught instanceof Error ? caught.message : "Could not read this screenshot."} You can fill the fields manually.`
+        `${t(caught instanceof Error ? caught.message : "Could not read this screenshot.")} ${t("You can fill the fields manually.")}`
       )
     }
+  }
+
+  async function handleProductPhotoChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0] ?? null
+
+    if (!file) {
+      setProductPhotoFile(null)
+      setProductPhotoPreview("")
+      return
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setError(t("Please upload an image."))
+      event.target.value = ""
+      return
+    }
+
+    setError("")
+
+    try {
+      setProductPhotoPreview(await readFileAsDataUrl(file))
+      setProductPhotoFile(file)
+    } catch {
+      setError(t("Could not preview the image. Please choose another image."))
+      event.target.value = ""
+    }
+  }
+
+  async function pickProduct(product: LocalShopProduct) {
+    setSelectedProductId(product.id)
+    setProductName(product.name)
+    setProductSize(product.note)
+    setCostPriceThb(product.priceThb ? String(product.priceThb) : "")
+    clearFieldError("productName", "productSize", "costPriceThb")
+    setProductPhotoFile(null)
+    setProductPhotoPreview("")
+
+    if (product.imagePath) {
+      try {
+        const urls = await getPhotoUrls([product.imagePath])
+
+        setProductPhotoPreview((current) => current || (urls[product.imagePath!] ?? ""))
+      } catch {
+        // The photo is only a preview.
+      }
+    }
+  }
+
+  function chooseShop(id: string) {
+    setSelectedShopId(id)
+    clearFieldError("shopPicker")
+    setSelectedProductId("")
+    setProductMode("existing")
   }
 
   async function handleSaveOrder(event: React.FormEvent<HTMLFormElement>) {
@@ -562,12 +465,47 @@ export default function CreateOrderPage() {
     const trimmedColor = productColor.trim()
     const trimmedDescription = productDescription.trim()
     const trimmedProductName = productName.trim()
-    const quantityNumber = Math.max(toNumber(quantity), 0)
+    const quantityNumber = Number(quantity.trim())
     const costPriceNumber = toNumber(costPriceThb)
     const sellingPriceNumber = toNumber(sellingPriceThb)
 
-    if (!productPhotoFile) {
-      setError("Product photo is required.")
+    // Check every required field at once, so all problems show together.
+    const problems: Record<string, string> = {}
+
+    if (customerMode === "existing") {
+      if (!selectedCustomer) problems.customerPicker = t("Choose a customer.")
+    } else if (!customerName.trim()) {
+      problems.customerName = t("Enter the customer's name.")
+    }
+
+    if (shopMode === "existing") {
+      if (!shops.some((shop) => shop.id === selectedShopId)) {
+        problems.shopPicker = t("Choose a shop.")
+      }
+    } else if (!newShopName.trim()) {
+      problems.newShopName = t("Enter the shop's name.")
+    }
+
+    if (!trimmedProductName) problems.productName = t("Enter the product name.")
+    if (!trimmedSize) problems.productSize = t("Enter the size or variant.")
+
+    if (!quantity.trim() || !Number.isInteger(quantityNumber) || quantityNumber < 1) {
+      problems.quantity = t("Quantity must be at least 1.")
+    }
+
+    if (costPriceThb.trim() === "" || !(Number(costPriceThb) >= 0)) {
+      problems.costPriceThb = t("Enter the cost price.")
+    }
+
+    if (sellingPriceThb.trim() === "" || !(Number(sellingPriceThb) > 0)) {
+      problems.sellingPriceThb = t("Enter a selling price above 0.")
+    }
+
+    setFieldErrors(problems)
+
+    if (Object.keys(problems).length > 0) {
+      setError(t("Please fill in the fields marked in red."))
+      focusFirstError(FIELD_ORDER, problems)
       return
     }
 
@@ -580,12 +518,7 @@ export default function CreateOrderPage() {
     }
     let newCustomer: CustomerInput | null = null
 
-    if (customerMode === "existing") {
-      if (!selectedCustomer) {
-        setError("Choose a customer, or switch to New customer.")
-        return
-      }
-
+    if (customerMode === "existing" && selectedCustomer) {
       customer = {
         name: selectedCustomer.name,
         facebookName: selectedCustomer.facebookName,
@@ -593,11 +526,6 @@ export default function CreateOrderPage() {
         address: selectedCustomer.address,
       }
     } else {
-      if (!customerName.trim()) {
-        setError("Customer name is required.")
-        return
-      }
-
       customer = {
         name: customerName.trim(),
         facebookName: facebookName.trim(),
@@ -607,13 +535,15 @@ export default function CreateOrderPage() {
       newCustomer = { ...customer, otherContacts: otherContacts.trim() }
     }
 
-    // Shop: optional. A saved one, a new one, or none yet.
+    // Shop: a saved one, or a new one that is saved with the order.
     let shopName = ""
+    let shopId = ""
     let newShop: ShopInput | null = null
 
     if (shopMode === "existing") {
       shopName = shops.find((shop) => shop.id === selectedShopId)?.name ?? ""
-    } else if (newShopName.trim()) {
+      shopId = selectedShopId
+    } else {
       shopName = newShopName.trim()
 
       const sameName = shops.find(
@@ -622,6 +552,7 @@ export default function CreateOrderPage() {
 
       if (sameName) {
         shopName = sameName.name
+        shopId = sameName.id
       } else {
         newShop = {
           name: shopName,
@@ -631,48 +562,55 @@ export default function CreateOrderPage() {
           note: "",
         }
       }
-    } else if (newShopPhone.trim() || newShopLocation.trim()) {
-      setError("Enter the new shop's name, or clear its details.")
-      return
-    }
-
-    if (!trimmedSize) {
-      setError("Product size is required.")
-      return
-    }
-
-    if (quantityNumber <= 0) {
-      setError("Quantity must be at least 1.")
-      return
     }
 
     setSaving(true)
 
     const uploadedPaths: string[] = []
+    let orderScreenshotPath: string | undefined
+    let productPhotoPath: string | undefined
+    let productImagePath: string | undefined
 
-    try {
-      // Photos go to Supabase Storage. A cropped product photo is saved next
-      // to the full screenshot. Without a crop, one resized copy is saved.
-      const hasCrop =
-        productPhotoPreview !== "" && productPhotoPreview !== orderScreenshotPreview
-
-      const productPhotoPath = await uploadPhoto(
-        hasCrop
-          ? productPhotoPreview
-          : await resizeImageToDataUrl(productPhotoFile, 1600, 0.8),
-        "orders"
+    // A product picked from the shop is already saved. Anything else is new.
+    const pickedProduct =
+      shopMode === "existing"
+        ? shops
+            .find((shop) => shop.id === selectedShopId)
+            ?.products.find((product) => product.id === selectedProductId)
+        : undefined
+    const shopProducts = shops.find((shop) => shop.id === selectedShopId)?.products ?? []
+    const isNewProduct =
+      !(productMode === "existing" && pickedProduct) &&
+      !(
+        shopMode === "existing" &&
+        shopProducts.some(
+          (product) =>
+            product.name.trim().toLowerCase() === trimmedProductName.toLowerCase()
+        )
       )
 
-      uploadedPaths.push(productPhotoPath)
-
-      let orderScreenshotPath: string | undefined
-
-      if (hasCrop) {
+    try {
+      // Photos go to Supabase Storage. Both are optional. A new product's
+      // photo is also saved for the shop product, so deleting the order never
+      // removes the shop's photo.
+      if (screenshotFile) {
         orderScreenshotPath = await uploadPhoto(
-          await resizeImageToDataUrl(productPhotoFile, 1600, 0.8),
+          await resizeImageToDataUrl(screenshotFile, 1600, 0.8),
           "orders"
         )
         uploadedPaths.push(orderScreenshotPath)
+      }
+
+      if (productPhotoFile) {
+        const resized = await resizeImageToDataUrl(productPhotoFile, 1600, 0.8)
+
+        productPhotoPath = await uploadPhoto(resized, "orders")
+        uploadedPaths.push(productPhotoPath)
+
+        if (isNewProduct) {
+          productImagePath = await uploadPhoto(resized, "products")
+          uploadedPaths.push(productImagePath)
+        }
       }
 
       const totalRetailerCostThb = costPriceNumber * quantityNumber
@@ -723,13 +661,13 @@ export default function CreateOrderPage() {
         retailerName: shopName,
         retailerUnitPriceThb: costPriceNumber,
         sellingUnitPriceThb: sellingPriceNumber,
-        productPhotoName: productPhotoFile.name,
+        productPhotoName: productPhotoFile?.name ?? "",
         productPhotoPath,
         orderScreenshotPath,
       })
     } catch (saveError) {
       await removePhotos(uploadedPaths)
-      setError(messageOf(saveError, "Could not save the order."))
+      setError(messageOf(saveError, t("Could not save the order.")))
       setSaving(false)
       return
     }
@@ -749,12 +687,20 @@ export default function CreateOrderPage() {
       }
     }
 
-    if (newShop) {
-      try {
-        await insertShop(newShop)
-      } catch {
-        // Ignored on purpose, see above.
+    // A new product is saved to its shop, which may be the new shop above.
+    try {
+      if (newShop) shopId = (await insertShop(newShop)).id
+
+      if (shopId && isNewProduct) {
+        await insertProduct(shopId, {
+          name: trimmedProductName,
+          priceThb: costPriceNumber,
+          note: trimmedSize,
+          imagePath: productImagePath,
+        })
       }
+    } catch {
+      await removePhotos([productImagePath])
     }
 
     router.push("/orders")
@@ -765,85 +711,68 @@ export default function CreateOrderPage() {
       <header className="sticky top-0 z-20 border-b bg-background/95 px-5 py-4 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md items-center gap-3">
           <Button asChild variant="ghost" size="icon" className="rounded-xl">
-            <Link href="/orders" aria-label="Back to orders">
+            <Link href="/orders" aria-label={t("Back to orders")}>
               <IconArrowLeft className="size-5" />
             </Link>
           </Button>
 
           <div>
-            <p className="text-sm text-muted-foreground">Orders</p>
-            <h1 className="font-heading text-2xl font-medium tracking-tight">
-              New Product Order
-            </h1>
+            <p className="text-sm text-muted-foreground">{t("Orders")}</p>
+            <h1 className="font-heading text-2xl font-medium tracking-tight">{t("New Product Order")}</h1>
           </div>
         </div>
       </header>
 
       <form
         onSubmit={handleSaveOrder}
-        className="mx-auto w-full max-w-md space-y-5 px-5 py-5"
+        className="mx-auto w-full max-w-md space-y-5 px-5 pb-40 pt-5"
       >
-        {error ? (
+        {loadError ? (
           <Alert variant="destructive" className="rounded-xl">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{loadError}</AlertDescription>
           </Alert>
         ) : null}
+
+        <p className="text-xs text-muted-foreground">
+          <RequiredMark /> {t("required")}
+        </p>
 
         <Card className="rounded-[20px] shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <IconCamera className="size-5 text-muted-foreground" />
-              Product Photo
+              <IconCamera className="size-5 text-muted-foreground" />{t("Chat Screenshot")}
             </CardTitle>
             <CardDescription>
               {useGemini
-                ? "Upload the Messenger screenshot. Gemini reads the customer, product and message details and fills the form."
-                : "Upload the Messenger screenshot. The product image and customer details are read on this device where possible."}
+                ? t("Optional. Upload the Messenger screenshot. Gemini reads the customer, product and message details and fills the form.")
+                : t("Optional. Upload the Messenger screenshot. The customer and product details are read on this device where possible.")}
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
             <Input
+              id="screenshot"
               type="file"
               accept="image/*"
               className="rounded-xl"
-              onChange={handleProductPhotoChange}
+              onChange={handleScreenshotChange}
             />
             <p className="text-xs text-muted-foreground">
-              Photos are deleted 7 days after you save the order. Pro accounts
-              can keep them for a month from the order page. To upgrade,
-              contact <UpgradeLink />.
+              <RichText text={t("Photos are deleted 7 days after you save the order. Pro accounts can keep them for a month from the order page. To upgrade, contact {email}.")} parts={{ email: <UpgradeLink /> }} />
             </p>
 
-            {productPhotoPreview ? (
+            {screenshotPreview ? (
               <div className="space-y-3">
                 <div className="overflow-hidden rounded-2xl border bg-background">
                   <Image
-                    src={productPhotoPreview}
-                    alt="Product photo preview"
+                    src={screenshotPreview}
+                    alt={t("Original order screenshot")}
                     width={800}
-                    height={800}
+                    height={1200}
                     unoptimized
                     className="max-h-96 w-full object-contain"
                   />
                 </div>
-
-                {orderScreenshotPreview &&
-                orderScreenshotPreview !== productPhotoPreview ? (
-                  <details className="rounded-xl border bg-background px-3 py-2">
-                    <summary className="cursor-pointer text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      Original screenshot
-                    </summary>
-                    <Image
-                      src={orderScreenshotPreview}
-                      alt="Original order screenshot"
-                      width={800}
-                      height={1200}
-                      unoptimized
-                      className="mt-3 max-h-96 w-full object-contain"
-                    />
-                  </details>
-                ) : null}
 
                 {readStatus ? (
                   <div className="flex items-start gap-2 rounded-xl border bg-background px-3 py-2 text-sm text-muted-foreground">
@@ -852,34 +781,25 @@ export default function CreateOrderPage() {
                   </div>
                 ) : null}
               </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed bg-background p-6 text-center">
-                <IconCamera className="mx-auto size-8 text-muted-foreground" />
-                <p className="mt-2 text-sm font-medium">
-                  No product photo selected
-                </p>
-              </div>
-            )}
+            ) : null}
           </CardContent>
         </Card>
 
         <Card className="rounded-[20px] shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <IconUser className="size-5 text-muted-foreground" />
-              Customer
+              <IconUser className="size-5 text-muted-foreground" />{t("Customer")}
+              <RequiredMark />
             </CardTitle>
-            <CardDescription>
-              Choose a saved customer or add a new one.
-            </CardDescription>
+            <CardDescription>{t("Choose a saved customer or add a new one.")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
             <ModeToggle
               value={customerMode}
               onChange={chooseCustomerMode}
-              existingLabel="Saved customer"
-              newLabel="New customer"
+              existingLabel={t("Saved customer")}
+              newLabel={t("New customer")}
             />
 
             {customerMode === "existing" ? (
@@ -894,30 +814,29 @@ export default function CreateOrderPage() {
                   }))}
                   value={selectedCustomerKey}
                   onChange={chooseCustomer}
-                  placeholder="Choose a customer"
-                  searchPlaceholder="Search name, phone, Facebook"
-                  emptyText="No saved customers match."
+                  placeholder={t("Choose a customer")}
+                  searchPlaceholder={t("Search name, phone, Facebook")}
+                  emptyText={t("No saved customers match.")}
                 />
+                <FieldError id="customerPicker" message={fieldErrors.customerPicker} />
 
                 {selectedCustomer ? (
                   <div className="space-y-1 rounded-2xl bg-muted p-3 text-sm">
                     {selectedCustomer.facebookName ? (
-                      <p>Facebook: {selectedCustomer.facebookName}</p>
+                      <p>{t("Facebook: {value}", { value: selectedCustomer.facebookName })}</p>
                     ) : null}
                     {selectedCustomer.phone ? (
-                      <p>Phone: {selectedCustomer.phone}</p>
+                      <p>{t("Phone: {value}", { value: selectedCustomer.phone })}</p>
                     ) : null}
                     {selectedCustomer.address ? (
                       <p className="whitespace-pre-wrap">
-                        Address: {selectedCustomer.address}
+                        {t("Address: {value}", { value: selectedCustomer.address })}
                       </p>
                     ) : null}
                     {!selectedCustomer.facebookName &&
                     !selectedCustomer.phone &&
                     !selectedCustomer.address ? (
-                      <p className="text-muted-foreground">
-                        No contact details saved.
-                      </p>
+                      <p className="text-muted-foreground">{t("No contact details saved.")}</p>
                     ) : null}
                   </div>
                 ) : null}
@@ -926,49 +845,52 @@ export default function CreateOrderPage() {
               <div className="space-y-4">
                 <TextField
                   id="customerName"
-                  label="Customer name"
+                  label={t("Customer name")}
                   value={customerName}
-                  onChange={setCustomerName}
-                  placeholder="Customer name"
+                  onChange={(value) => {
+                setCustomerName(value)
+                clearFieldError("customerName")
+              }}
+              required
+              error={fieldErrors.customerName}
+                  placeholder={t("Customer name")}
                 />
                 <TextField
                   id="facebookName"
-                  label="Facebook name"
+                  label={t("Facebook name")}
                   value={facebookName}
                   onChange={setFacebookName}
-                  placeholder="Facebook display name"
+                  placeholder={t("Facebook display name")}
                 />
                 <TextField
                   id="phone"
-                  label="Phone number"
+                  label={t("Phone number")}
                   value={phone}
                   onChange={setPhone}
-                  placeholder="Phone number"
+                  placeholder={t("Phone number")}
                   inputMode="tel"
                 />
                 <div className="space-y-2">
-                  <Label htmlFor="location">Address</Label>
+                  <Label htmlFor="location">{t("Address")}</Label>
                   <Textarea
                     id="location"
                     value={location}
                     onChange={(event) => setLocation(event.target.value)}
-                    placeholder="Customer delivery address"
+                    placeholder={t("Customer delivery address")}
                     className="min-h-24 rounded-xl text-base"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="otherContacts">Other contacts</Label>
+                  <Label htmlFor="otherContacts">{t("Other contacts")}</Label>
                   <Textarea
                     id="otherContacts"
                     value={otherContacts}
                     onChange={(event) => setOtherContacts(event.target.value)}
-                    placeholder="Viber, Telegram, second phone"
+                    placeholder={t("Viber, Telegram, second phone")}
                     className="min-h-20 rounded-xl text-base"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  The customer is saved to your customer list with this order.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("The customer is saved to your customer list with this order.")}</p>
               </div>
             )}
           </CardContent>
@@ -977,23 +899,25 @@ export default function CreateOrderPage() {
         <Card className="rounded-[20px] shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <IconBuildingStore className="size-5 text-muted-foreground" />
-              Shop
+              <IconBuildingStore className="size-5 text-muted-foreground" />{t("Shop")}
+              <RequiredMark />
             </CardTitle>
-            <CardDescription>
-              Optional. Where this product will be bought.
-            </CardDescription>
+            <CardDescription>{t("Where this product will be bought.")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
             <ModeToggle
               value={shopMode}
-              onChange={setShopMode}
-              existingLabel="Saved shop"
-              newLabel="New shop"
+              onChange={(mode) => {
+                setShopMode(mode)
+                clearFieldError("shopPicker", "newShopName")
+              }}
+              existingLabel={t("Saved shop")}
+              newLabel={t("New shop")}
             />
 
             {shopMode === "existing" ? (
+              <div className="space-y-2">
               <SearchPicker
                 id="shopPicker"
                 items={shops
@@ -1005,40 +929,45 @@ export default function CreateOrderPage() {
                     description: shop.location || undefined,
                   }))}
                 value={selectedShopId}
-                onChange={setSelectedShopId}
-                placeholder="Choose a shop"
-                searchPlaceholder="Search shop or location"
-                emptyText="No saved shops match."
+                onChange={chooseShop}
+                placeholder={t("Choose a shop")}
+                searchPlaceholder={t("Search shop or location")}
+                emptyText={t("No saved shops match.")}
               />
+              <FieldError id="shopPicker" message={fieldErrors.shopPicker} />
+              </div>
             ) : (
               <div className="space-y-4">
                 <TextField
                   id="newShopName"
-                  label="Shop name"
+                  label={t("Shop name")}
                   value={newShopName}
-                  onChange={setNewShopName}
-                  placeholder="Bangkok shop"
+                  onChange={(value) => {
+                setNewShopName(value)
+                clearFieldError("newShopName")
+              }}
+              required
+              error={fieldErrors.newShopName}
+                  placeholder={t("Bangkok shop")}
                 />
                 <TextField
                   id="newShopPhone"
-                  label="Phone or LINE (optional)"
+                  label={t("Phone or LINE (optional)")}
                   value={newShopPhone}
                   onChange={setNewShopPhone}
-                  placeholder="Phone number or LINE ID"
+                  placeholder={t("Phone number or LINE ID")}
                 />
                 <div className="space-y-2">
-                  <Label htmlFor="newShopLocation">Location (optional)</Label>
+                  <Label htmlFor="newShopLocation">{t("Location (optional)")}</Label>
                   <Textarea
                     id="newShopLocation"
                     value={newShopLocation}
                     onChange={(event) => setNewShopLocation(event.target.value)}
-                    placeholder="Shop address, mall, or market"
+                    placeholder={t("Shop address, mall, or market")}
                     className="min-h-20 rounded-xl text-base"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  The shop is saved to your shop list with this order.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("The shop is saved to your shop list with this order.")}</p>
               </div>
             )}
           </CardContent>
@@ -1047,30 +976,46 @@ export default function CreateOrderPage() {
         <Card className="rounded-[20px] shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <IconMessage2 className="size-5 text-muted-foreground" />
-              Product Info
-            </CardTitle>
-            <CardDescription>
-              Record description, size, and color from the customer chat.
-            </CardDescription>
+              <IconMessage2 className="size-5 text-muted-foreground" />{t("Product Info")}</CardTitle>
+            <CardDescription>{t("Record description, size, and color from the customer chat.")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
+            <OrderProductFields
+              products={
+                shopMode === "existing"
+                  ? (shops.find((shop) => shop.id === selectedShopId)?.products ?? [])
+                  : []
+              }
+              mode={productMode}
+              onModeChange={setProductMode}
+              productId={selectedProductId}
+              onPickProduct={pickProduct}
+              photoPreview={productPhotoPreview}
+              onPhotoChange={handleProductPhotoChange}
+              photoLabel={t("Product photo (optional)")}
+            />
+
             <TextField
               id="productName"
-              label="Product name"
+              label={t("Product name")}
               value={productName}
-              onChange={setProductName}
-              placeholder="Nike Air Force 1, dress, bag..."
+              onChange={(value) => {
+                setProductName(value)
+                clearFieldError("productName")
+              }}
+              required
+              error={fieldErrors.productName}
+              placeholder={t("Nike Air Force 1, dress, bag...")}
             />
 
             <div className="space-y-2">
-              <Label htmlFor="productDescription">Description</Label>
+              <Label htmlFor="productDescription">{t("Description")}</Label>
               <Textarea
                 id="productDescription"
                 value={productDescription}
                 onChange={(event) => setProductDescription(event.target.value)}
-                placeholder="Dress, bag, shoes, or product note"
+                placeholder={t("Dress, bag, shoes, or product note")}
                 className="min-h-24 rounded-xl text-base"
               />
             </div>
@@ -1078,60 +1023,80 @@ export default function CreateOrderPage() {
             <div className="grid grid-cols-2 gap-3">
               <TextField
                 id="productSize"
-                label="Size / variant *"
+                label={t("Size / variant")}
                 value={productSize}
-                onChange={setProductSize}
-                placeholder="XS, 42, L..."
+                onChange={(value) => {
+                setProductSize(value)
+                clearFieldError("productSize")
+              }}
+              required
+              error={fieldErrors.productSize}
+                placeholder={t("XS, 42, L...")}
               />
               <TextField
                 id="productColor"
-                label="Color"
+                label={t("Color")}
                 value={productColor}
                 onChange={setProductColor}
-                placeholder="White, black..."
+                placeholder={t("White, black...")}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <TextField
                 id="quantity"
-                label="Quantity"
+                label={t("Quantity")}
                 type="number"
                 inputMode="numeric"
                 min="1"
                 value={quantity}
-                onChange={setQuantity}
+                onChange={(value) => {
+                setQuantity(value)
+                clearFieldError("quantity")
+              }}
+              required
+              error={fieldErrors.quantity}
               />
               <TextField
                 id="costPriceThb"
-                label="Cost price (฿)"
+                label={t("Cost price (฿)")}
                 type="number"
                 inputMode="decimal"
                 min="0"
                 value={costPriceThb}
-                onChange={setCostPriceThb}
+                onChange={(value) => {
+                setCostPriceThb(value)
+                clearFieldError("costPriceThb")
+              }}
+              required
+              error={fieldErrors.costPriceThb}
                 placeholder="0"
               />
             </div>
 
             <TextField
               id="sellingPriceThb"
-              label="Selling price (฿)"
+              label={t("Selling price (฿)")}
               type="number"
               inputMode="decimal"
               min="0"
               value={sellingPriceThb}
-              onChange={setSellingPriceThb}
+              onChange={(value) => {
+                setSellingPriceThb(value)
+                clearFieldError("sellingPriceThb")
+              }}
+              required
+              error={fieldErrors.sellingPriceThb}
               placeholder="0"
             />
 
             <div className="space-y-2">
-              <Label htmlFor="customerMessage">Customer note</Label>
+              <Label htmlFor="customerMessage">{t("Customer note")}</Label>
               <Textarea
                 id="customerMessage"
                 value={customerMessage}
                 onChange={(event) => setCustomerMessage(event.target.value)}
-                placeholder="Optional: paste any Burmese message or note"
+                placeholder={t("Optional: paste any Burmese message or note")}
                 className="min-h-24 rounded-xl text-base"
               />
             </div>
@@ -1141,17 +1106,13 @@ export default function CreateOrderPage() {
         <Card className="rounded-[20px] shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <IconTruckDelivery className="size-5 text-muted-foreground" />
-              Status
-            </CardTitle>
-            <CardDescription>
-              Track payment and buying or delivery progress.
-            </CardDescription>
+              <IconTruckDelivery className="size-5 text-muted-foreground" />{t("Status")}</CardTitle>
+            <CardDescription>{t("Track payment and buying or delivery progress.")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="paymentStatus">Payment status</Label>
+              <Label htmlFor="paymentStatus">{t("Payment status")}</Label>
               <Select
                 value={paymentStatus}
                 onValueChange={(value) => setPaymentStatus(value as PaymentStatus)}
@@ -1162,7 +1123,7 @@ export default function CreateOrderPage() {
                 <SelectContent>
                   {PAYMENT_STATUSES.map((key) => (
                     <SelectItem key={key} value={key}>
-                      {PAYMENT_STATUS_LABELS[key]}
+                      {t(PAYMENT_STATUS_LABELS[key])}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1172,7 +1133,7 @@ export default function CreateOrderPage() {
             {paymentStatus === "partially_paid" ? (
               <TextField
                 id="amountPaidThb"
-                label="Amount paid so far (฿)"
+                label={t("Amount paid so far (฿)")}
                 type="number"
                 inputMode="decimal"
                 min="0"
@@ -1183,7 +1144,7 @@ export default function CreateOrderPage() {
             ) : null}
 
             <div className="space-y-2">
-              <Label htmlFor="orderStatus">Order status</Label>
+              <Label htmlFor="orderStatus">{t("Order status")}</Label>
               <Select
                 value={orderStatus}
                 onValueChange={(value) => setOrderStatus(value as OrderStatus)}
@@ -1194,7 +1155,7 @@ export default function CreateOrderPage() {
                 <SelectContent>
                   {ORDER_STATUSES.map((key) => (
                     <SelectItem key={key} value={key}>
-                      {ORDER_STATUS_LABELS[key]}
+                      {t(ORDER_STATUS_LABELS[key])}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1204,9 +1165,17 @@ export default function CreateOrderPage() {
         </Card>
 
         <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-5 pb-5 pt-3 backdrop-blur">
+          {error ? (
+            <p
+              role="alert"
+              className="mx-auto mb-2 w-full max-w-md text-sm text-destructive"
+            >
+              {error}
+            </p>
+          ) : null}
           <div className="mx-auto flex w-full max-w-md gap-3">
             <Button asChild variant="outline" className="h-12 flex-1 rounded-xl">
-              <Link href="/orders">Cancel</Link>
+              <Link href="/orders">{t("Cancel")}</Link>
             </Button>
 
             <Button
@@ -1215,7 +1184,7 @@ export default function CreateOrderPage() {
               disabled={saving}
             >
               <IconDeviceFloppy className="mr-2 size-5" />
-              {saving ? "Saving..." : "Save Order"}
+              {saving ? t("Saving...") : t("Save Order")}
             </Button>
           </div>
         </div>
@@ -1268,6 +1237,8 @@ function TextField({
   type = "text",
   inputMode,
   min,
+  required,
+  error,
 }: {
   id: string
   label: string
@@ -1277,10 +1248,15 @@ function TextField({
   type?: string
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]
   min?: string
+  required?: boolean
+  error?: string
 }) {
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id}>
+        {label}
+        {required ? <RequiredMark /> : null}
+      </Label>
       <Input
         id={id}
         type={type}
@@ -1289,8 +1265,11 @@ function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
         className="h-12 rounded-xl text-base"
       />
+      <FieldError id={id} message={error} />
     </div>
   )
 }

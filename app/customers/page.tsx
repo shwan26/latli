@@ -38,10 +38,14 @@ import { type LocalOrder } from "../lib/local-orders"
 import { insertCustomer, listCustomers } from "@/lib/db/customers"
 import { listOrders } from "@/lib/db/orders"
 import { messageOf } from "@/lib/db/shared"
+import { useI18n } from "@/lib/i18n/provider"
+import { translate } from "@/lib/i18n/runtime"
 
 type SortKey = "name" | "newest" | "orders" | "amount"
 
 export default function CustomersPage() {
+  const { t } = useI18n()
+
   const [mounted, setMounted] = useState(false)
   const [orders, setOrders] = useState<LocalOrder[]>([])
   const [customers, setCustomers] = useState<LocalCustomer[]>([])
@@ -68,7 +72,7 @@ export default function CustomersPage() {
         setOrders(loadedOrders)
         setCustomers(loadedCustomers)
       } catch (error) {
-        if (!cancelled) setLoadError(messageOf(error, "Could not load customers."))
+        if (!cancelled) setLoadError(messageOf(error, translate("Could not load customers.")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -140,7 +144,7 @@ export default function CustomersPage() {
     const key = getCustomerKey(input)
 
     if (customers.some((existing) => getCustomerKey(existing) === key)) {
-      setErrorMessage("A customer with this phone, Facebook or name is already saved.")
+      setErrorMessage(t("A customer with this phone, Facebook or name is already saved."))
       return
     }
 
@@ -152,7 +156,7 @@ export default function CustomersPage() {
       setCustomers((current) => [...current, customer])
       setAdding(false)
     } catch (error) {
-      setErrorMessage(messageOf(error, "Could not save the customer."))
+      setErrorMessage(messageOf(error, t("Could not save the customer.")))
     } finally {
       setSaving(false)
     }
@@ -162,7 +166,7 @@ export default function CustomersPage() {
     return (
       <main className="min-h-dvh bg-muted px-5 py-5">
         <div className="mx-auto w-full max-w-md">
-          <p className="text-sm text-muted-foreground">Loading customers...</p>
+          <p className="text-sm text-muted-foreground">{t("Loading customers...")}</p>
         </div>
       </main>
     )
@@ -174,18 +178,16 @@ export default function CustomersPage() {
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">
-              {summaries.length} customer{summaries.length === 1 ? "" : "s"}
+              {t(summaries.length === 1 ? "{count} customer" : "{count} customers", { count: summaries.length })}
             </p>
-            <h1 className="font-heading text-2xl font-medium tracking-tight">
-              Customers
-            </h1>
+            <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Customers")}</h1>
           </div>
 
           <Button
             type="button"
             size="icon"
             className="size-11 rounded-xl"
-            aria-label="Add customer"
+            aria-label={t("Add customer")}
             onClick={openAddCustomer}
           >
             <IconPlus className="size-5" />
@@ -206,8 +208,8 @@ export default function CustomersPage() {
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search name, phone, Facebook..."
-              aria-label="Search customers"
+              placeholder={t("Search name, phone, Facebook...")}
+              aria-label={t("Search customers")}
               className="h-12 rounded-xl bg-background pl-10 text-base"
             />
           </div>
@@ -215,15 +217,15 @@ export default function CustomersPage() {
           <Select value={sort} onValueChange={(value) => setSort(value as SortKey)}>
             <SelectTrigger
               className="h-12 rounded-xl bg-background"
-              aria-label="Sort customers"
+              aria-label={t("Sort customers")}
             >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="amount">Highest amount</SelectItem>
-              <SelectItem value="orders">Most orders</SelectItem>
-              <SelectItem value="name">A to Z</SelectItem>
-              <SelectItem value="newest">Latest created</SelectItem>
+              <SelectItem value="amount">{t("Highest amount")}</SelectItem>
+              <SelectItem value="orders">{t("Most orders")}</SelectItem>
+              <SelectItem value="name">{t("A to Z")}</SelectItem>
+              <SelectItem value="newest">{t("Latest created")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -234,12 +236,8 @@ export default function CustomersPage() {
               <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-muted">
                 <IconUsers className="size-7 text-muted-foreground" />
               </div>
-              <h2 className="mt-4 font-heading text-lg font-medium">
-                No customers found
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Tap + to add a customer.
-              </p>
+              <h2 className="mt-4 font-heading text-lg font-medium">{t("No customers found")}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{t("Tap + to add a customer.")}</p>
             </CardContent>
           </Card>
         ) : (
@@ -256,11 +254,8 @@ export default function CustomersPage() {
       <Sheet open={adding} onOpenChange={setAdding}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
           <SheetHeader className="border-b">
-            <SheetTitle className="font-heading text-xl">Add Customer</SheetTitle>
-            <SheetDescription>
-              Orders with the same phone, Facebook or name are linked to this
-              customer.
-            </SheetDescription>
+            <SheetTitle className="font-heading text-xl">{t("Add Customer")}</SheetTitle>
+            <SheetDescription>{t("Orders with the same phone, Facebook or name are linked to this customer.")}</SheetDescription>
           </SheetHeader>
 
           <CustomerForm
@@ -280,6 +275,8 @@ export default function CustomersPage() {
 }
 
 function CustomerRow({ customer }: { customer: CustomerSummary }) {
+  const { t } = useI18n()
+
   return (
     <li>
       <Link
@@ -289,7 +286,7 @@ function CustomerRow({ customer }: { customer: CustomerSummary }) {
         <div className="min-w-0">
           <p className="truncate font-medium">{customer.name}</p>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {customer.orderCount} order{customer.orderCount === 1 ? "" : "s"}
+            {t(customer.orderCount === 1 ? "{count} order" : "{count} orders", { count: customer.orderCount })}
           </p>
         </div>
         <p className="shrink-0 font-semibold">{formatBaht(customer.totalThb)}</p>

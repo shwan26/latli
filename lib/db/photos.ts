@@ -1,3 +1,5 @@
+import { translate } from "@/lib/i18n/runtime"
+
 import { check, getDb } from "./shared"
 
 const BUCKET = "photos"
@@ -12,7 +14,7 @@ export async function uploadPhoto(dataUrl: string, folder: PhotoFolder) {
     data: { user },
   } = await db.auth.getUser()
 
-  if (!user) throw new Error("You are signed out. Log in again.")
+  if (!user) throw new Error(translate("You are signed out. Log in again."))
 
   const blob = await (await fetch(dataUrl)).blob()
   const extension =

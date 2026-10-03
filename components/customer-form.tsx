@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { useI18n } from "@/lib/i18n/provider"
 
 export type CustomerDraft = {
   name: string
@@ -30,6 +31,8 @@ export function CustomerForm({
   errorMessage: string
   idPrefix: string
 }) {
+  const { t } = useI18n()
+
   return (
     <form onSubmit={onSubmit} className="space-y-4 p-4">
       {errorMessage ? (
@@ -39,58 +42,58 @@ export function CustomerForm({
       ) : null}
 
       <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-name`}>Name</Label>
+        <Label htmlFor={`${idPrefix}-name`}>{t("Name")}</Label>
         <Input
           id={`${idPrefix}-name`}
           value={draft.name}
           onChange={(event) => onChange("name", event.target.value)}
-          placeholder="Customer name"
+          placeholder={t("Customer name")}
           required
           className="h-12 rounded-xl text-base"
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-facebook`}>Facebook</Label>
+        <Label htmlFor={`${idPrefix}-facebook`}>{t("Facebook")}</Label>
         <Input
           id={`${idPrefix}-facebook`}
           value={draft.facebookName}
           onChange={(event) => onChange("facebookName", event.target.value)}
-          placeholder="Facebook name"
+          placeholder={t("Facebook name")}
           className="h-12 rounded-xl text-base"
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-phone`}>Phone number</Label>
+        <Label htmlFor={`${idPrefix}-phone`}>{t("Phone number")}</Label>
         <Input
           id={`${idPrefix}-phone`}
           type="tel"
           value={draft.phone}
           onChange={(event) => onChange("phone", event.target.value)}
-          placeholder="Phone number"
+          placeholder={t("Phone number")}
           className="h-12 rounded-xl text-base"
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-address`}>Address</Label>
+        <Label htmlFor={`${idPrefix}-address`}>{t("Address")}</Label>
         <Textarea
           id={`${idPrefix}-address`}
           value={draft.address}
           onChange={(event) => onChange("address", event.target.value)}
-          placeholder="Delivery address"
+          placeholder={t("Delivery address")}
           className="min-h-24 rounded-xl text-base"
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-other`}>Other contacts</Label>
+        <Label htmlFor={`${idPrefix}-other`}>{t("Other contacts")}</Label>
         <Textarea
           id={`${idPrefix}-other`}
           value={draft.otherContacts}
           onChange={(event) => onChange("otherContacts", event.target.value)}
-          placeholder="Viber, Telegram, second phone"
+          placeholder={t("Viber, Telegram, second phone")}
           className="min-h-20 rounded-xl text-base"
         />
       </div>

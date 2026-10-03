@@ -8,40 +8,43 @@ import {
   IconPackage,
   IconUsers,
 } from "@tabler/icons-react"
+import { useI18n } from "@/lib/i18n/provider"
 
 type BottomNavigationProps = {
   active: "dashboard" | "orders" | "shops" | "customers" | "more"
 }
 
 export function BottomNavigation({ active }: BottomNavigationProps) {
+  const { t } = useI18n()
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 px-4 pb-4 pt-2 backdrop-blur">
       <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
         <BottomNavItem
           href="/dashboard"
-          label="Dashboard"
+          label={t("Dashboard")}
           active={active === "dashboard"}
         >
           <IconChartBar className="size-5" />
         </BottomNavItem>
 
-        <BottomNavItem href="/orders" label="Orders" active={active === "orders"}>
+        <BottomNavItem href="/orders" label={t("Orders")} active={active === "orders"}>
           <IconPackage className="size-5" />
         </BottomNavItem>
 
-        <BottomNavItem href="/shops" label="Shops" active={active === "shops"}>
+        <BottomNavItem href="/shops" label={t("Shops")} active={active === "shops"}>
           <IconBuildingStore className="size-5" />
         </BottomNavItem>
 
         <BottomNavItem
           href="/customers"
-          label="Customers"
+          label={t("Customers")}
           active={active === "customers"}
         >
           <IconUsers className="size-5" />
         </BottomNavItem>
 
-        <BottomNavItem href="/more" label="More" active={active === "more"}>
+        <BottomNavItem href="/more" label={t("More")} active={active === "more"}>
           <IconDots className="size-5" />
         </BottomNavItem>
       </div>

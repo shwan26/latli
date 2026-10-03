@@ -38,8 +38,12 @@ import {
   formatKyat,
   getOrderRate,
 } from "../lib/currency"
+import { useI18n } from "@/lib/i18n/provider"
+import { translate } from "@/lib/i18n/runtime"
 
 export default function DashboardPage() {
+  const { t } = useI18n()
+
   const [orders, setOrders] = useState<LocalOrder[]>([])
   const [mounted, setMounted] = useState(false)
   const [loadError, setLoadError] = useState("")
@@ -53,7 +57,7 @@ export default function DashboardPage() {
 
         if (!cancelled) setOrders(loaded)
       } catch (error) {
-        if (!cancelled) setLoadError(messageOf(error, "Could not load orders."))
+        if (!cancelled) setLoadError(messageOf(error, translate("Could not load orders.")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -160,7 +164,7 @@ export default function DashboardPage() {
     return (
       <main className="min-h-dvh bg-muted px-5 py-5">
         <div className="mx-auto w-full max-w-md">
-          <p className="text-sm text-muted-foreground">Loading dashboard...</p>
+          <p className="text-sm text-muted-foreground">{t("Loading dashboard...")}</p>
         </div>
       </main>
     )
@@ -171,14 +175,12 @@ export default function DashboardPage() {
       <header className="sticky top-0 z-10 border-b bg-background/95 px-5 py-4 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-muted-foreground">Welcome back</p>
-            <h1 className="font-heading text-2xl font-medium tracking-tight">
-              Dashboard
-            </h1>
+            <p className="text-sm text-muted-foreground">{t("Welcome back")}</p>
+            <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Dashboard")}</h1>
           </div>
 
           <Button asChild size="icon" className="size-11 rounded-xl">
-            <Link href="/orders/create" aria-label="Add order">
+            <Link href="/orders/create" aria-label={t("Add order")}>
               <IconPlus className="size-5" />
             </Link>
           </Button>
@@ -193,36 +195,36 @@ export default function DashboardPage() {
         ) : null}
 
         <section className="space-y-3">
-          <h2 className="font-heading text-lg font-medium">Orders</h2>
+          <h2 className="font-heading text-lg font-medium">{t("Orders")}</h2>
 
           <div className="grid grid-cols-2 gap-3">
             <StatusMiniCard
-              title="Not bought"
+              title={t("Not bought")}
               value={summary.notBoughtCount}
               icon={IconShoppingCartOff}
             />
             <StatusMiniCard
-              title="Bought"
+              title={t("Bought")}
               value={summary.boughtCount}
               icon={IconPackage}
             />
             <StatusMiniCard
-              title="With cargo"
+              title={t("With cargo")}
               value={summary.sentCargoCount}
               icon={IconTruckDelivery}
             />
             <StatusMiniCard
-              title="Delivered"
+              title={t("Delivered")}
               value={summary.deliveredCount}
               icon={IconBox}
             />
             <StatusMiniCard
-              title="Complete"
+              title={t("Complete")}
               value={summary.completeCount}
               icon={IconCircleCheck}
             />
             <StatusMiniCard
-              title="Unpaid"
+              title={t("Unpaid")}
               value={summary.unpaidCount}
               icon={IconAlertCircle}
             />
@@ -233,9 +235,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2 text-base font-medium">
-                <IconShoppingBag className="size-5 text-muted-foreground" />
-                Orders to buy
-              </span>
+                <IconShoppingBag className="size-5 text-muted-foreground" />{t("Orders to buy")}</span>
               <Badge variant={summary.notBoughtCount > 0 ? "default" : "secondary"}>
                 {summary.notBoughtCount}
               </Badge>
@@ -245,10 +245,8 @@ export default function DashboardPage() {
           <CardContent className="space-y-3">
             {summary.notBoughtCount === 0 ? (
               <div className="rounded-2xl bg-muted p-4">
-                <p className="text-sm font-medium">No orders waiting to buy</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  New customer orders with status Not bought will show here.
-                </p>
+                <p className="text-sm font-medium">{t("No orders waiting to buy")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("New customer orders with status Not bought will show here.")}</p>
               </div>
             ) : (
               <ul className="divide-y rounded-2xl border bg-background">
@@ -260,31 +258,29 @@ export default function DashboardPage() {
                   />
                 ))}
                 {summary.noShopCount > 0 ? (
-                  <ShopLine label="No shop" count={summary.noShopCount} />
+                  <ShopLine label={t("No shop")} count={summary.noShopCount} />
                 ) : null}
               </ul>
             )}
 
             <div className="grid grid-cols-2 gap-3">
               <Button asChild variant="outline" className="h-11 rounded-xl">
-                <Link href="/orders">View all</Link>
+                <Link href="/orders">{t("View all")}</Link>
               </Button>
               <Button asChild className="h-11 rounded-xl">
                 <Link href="/orders/create">
-                  <IconPlus className="mr-2 size-4" />
-                  Add order
-                </Link>
+                  <IconPlus className="mr-2 size-4" />{t("Add order")}</Link>
               </Button>
             </div>
           </CardContent>
         </Card>
 
         <section className="space-y-3">
-          <h2 className="font-heading text-lg font-medium">Money</h2>
+          <h2 className="font-heading text-lg font-medium">{t("Money")}</h2>
 
           <DashboardMoneyCard
-            title="Total sales"
-            description="Customer payable, refunds excluded"
+            title={t("Total sales")}
+            description={t("Customer payable, refunds excluded")}
             href="/orders"
             icon={IconChartBar}
             baht={summary.totalSalesThb}
@@ -292,8 +288,8 @@ export default function DashboardPage() {
           />
 
           <DashboardMoneyCard
-            title="Profit"
-            description="Owner only"
+            title={t("Profit")}
+            description={t("Owner only")}
             href="/orders"
             icon={IconWallet}
             badge="Owner"
@@ -302,7 +298,7 @@ export default function DashboardPage() {
           />
 
           <DashboardMoneyCard
-            title="Unpaid"
+            title={t("Unpaid")}
             description={`${summary.unpaidCount} ${summary.unpaidCount === 1 ? "order" : "orders"} still have balance`}
             href="/orders"
             icon={IconAlertCircle}
@@ -312,7 +308,7 @@ export default function DashboardPage() {
           />
 
           <DashboardMoneyCard
-            title="Refund"
+            title={t("Refund")}
             description={`${summary.refundCount} refunded ${summary.refundCount === 1 ? "order" : "orders"}`}
             href="/orders"
             icon={IconArrowBackUp}
@@ -329,11 +325,13 @@ export default function DashboardPage() {
 }
 
 function ShopLine({ label, count }: { label: string; count: number }) {
+  const { t } = useI18n()
+
   return (
     <li className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
       <span className="min-w-0 truncate font-medium">{label}</span>
       <span className="shrink-0 text-muted-foreground">
-        {count} {count === 1 ? "order" : "orders"}
+        {t(count === 1 ? "{count} order" : "{count} orders", { count })}
       </span>
     </li>
   )
@@ -380,6 +378,8 @@ function DashboardMoneyCard({
   baht: number
   kyat: number
 }) {
+  const { t } = useI18n()
+
   return (
     <Link href={href} className="block">
       <Card className="rounded-[20px] shadow-none transition active:scale-[0.99]">
@@ -407,14 +407,14 @@ function DashboardMoneyCard({
 
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <div className="rounded-xl border bg-background px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">Baht</p>
+                  <p className="text-[11px] text-muted-foreground">{t("Baht")}</p>
                   <p className="mt-0.5 text-sm font-semibold">
                     {formatBaht(baht)}
                   </p>
                 </div>
 
                 <div className="rounded-xl border bg-background px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">Kyat</p>
+                  <p className="text-[11px] text-muted-foreground">{t("Kyat")}</p>
                   <p className="mt-0.5 text-sm font-semibold">
                     {formatKyat(kyat)}
                   </p>
