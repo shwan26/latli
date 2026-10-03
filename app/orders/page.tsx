@@ -3,22 +3,14 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Image from "next/image"
 import Link from "next/link"
-import {
-  IconChartBar,
-  IconDots,
-  IconEye,
-  IconPackage,
-  IconPhoto,
-  IconPlus,
-  IconSearch,
-  IconUsers,
-  IconWallet,
-} from "@tabler/icons-react"
+import { IconPackage, IconPlus, IconSearch } from "@tabler/icons-react"
 
+import { BottomNavigation } from "@/components/bottom-navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -29,118 +21,35 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-type Currency = "THB" | "MMK"
+import { formatBaht, formatKyat, getOrderRate } from "../lib/currency"
+import {
+  ORDER_STATUS_LABELS,
+  ORDER_STATUSES,
+  PAYMENT_STATUS_LABELS,
+  PAYMENT_STATUSES,
+  type LocalOrder,
+  type OrderStatus,
+} from "../lib/local-orders"
+import { listOrders } from "@/lib/db/orders"
+import { listShops } from "@/lib/db/shops"
+import { messageOf } from "@/lib/db/shared"
 
-type LocalOrder = {
-  id: string
-  orderNumber: string
-  customerName: string
-
-  orderStatus:
-    | "new_order"
-    | "waiting_deposit"
-    | "deposit_paid"
-    | "ordered_from_retailer"
-    | "received_from_retailer"
-    | "sent_to_cargo"
-    | "in_delivery"
-    | "delivered"
-    | "completed"
-    | "cancelled"
-
-  paymentStatus:
-    | "not_paid"
-    | "receiving"
-    | "deposit_paid"
-    | "partially_paid"
-    | "fully_paid"
-    | "refunded"
-
-  deliveryStatus:
-    | "not_arranged"
-    | "product_bought"
-    | "waiting_pickup"
-    | "picked_up"
-    | "sent_to_cargo"
-    | "in_transit"
-    | "delivered"
-    | "delayed"
-    | "returned"
-
-  baseCurrency: "THB"
-  customerCurrency: Currency
-  exchangeRateThbToMmk: number
-
-  totalRetailerCostThb: number
-  totalCustomerPayableThb: number
-  totalPaidThb: number
-  remainingBalanceThb: number
-  profitThb: number
-
-  createdAt: string
-
-  facebookName?: string
-  phone?: string
-  address?: string
-
-  sourceType?: string
-  customerMessageBurmese?: string
-  productSize?: string
-  productColor?: string
-  productDescription?: string
-  productPhotoName?: string
-  productPhotoDataUrl?: string
-  orderScreenshotName?: string
-  orderScreenshotDataUrl?: string
-
-  productName?: string
-  productOption?: string
-  quantity?: number
-  productNote?: string
-  retailerUnitPriceThb?: number
-  sellingUnitPriceThb?: number
-
-  retailerName?: string
-  retailerLineId?: string
-
-  cargoCompanyName?: string
-  trackingNumber?: string
-}
-
-const LOCAL_STORAGE_KEY = "latli_orders"
-
-function getStoredOrders(): LocalOrder[] {
-  if (typeof window === "undefined") return []
-
-  const stored = window.localStorage.getItem(LOCAL_STORAGE_KEY)
-
-  if (!stored) {
-    return []
-  }
-
-  try {
-    return JSON.parse(stored) as LocalOrder[]
-  } catch {
-    return []
-  }
-}
-
-function formatBaht(value: number) {
-  return `฿${Math.round(value || 0).toLocaleString("en-US")}`
-}
-
-function formatKyat(value: number) {
-  return `MMK ${Math.round(value || 0).toLocaleString("en-US")}`
+const STATUS_VARIANTS: Record<
+  OrderStatus,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
+  not_bought: "outline",
+  bought: "secondary",
+  sent_cargo: "secondary",
+  delivered: "secondary",
+  complete: "default",
+  returned: "destructive",
 }
 
 function formatDate(value: string) {
-  if (!value) return "-"
-
   const date = new Date(value)
 
-  if (Number.isNaN(date.getTime())) {
-    return "-"
-  }
+  if (Number.isNaN(date.getTime())) return "-"
 
   return date.toLocaleDateString("en-US", {
     year: "numeric",
@@ -149,116 +58,134 @@ function formatDate(value: string) {
   })
 }
 
-function toLabel(value: string) {
-  return value
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-}
+// Local calendar day as YYYY-MM-DD, the same format a date input produces.
+function toDateKey(value: string) {
+  const date = new Date(value)
 
-function getStatusVariant(
-  status: string
-): "default" | "secondary" | "destructive" | "outline" {
-  if (
-    status === "cancelled" ||
-    status === "returned" ||
-    status === "delayed" ||
-    status === "refunded"
-  ) {
-    return "destructive"
-  }
+  if (Number.isNaN(date.getTime())) return ""
 
-  if (
-    status === "completed" ||
-    status === "delivered" ||
-    status === "fully_paid"
-  ) {
-    return "default"
-  }
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
 
-  if (
-    status === "not_paid" ||
-    status === "waiting_deposit" ||
-    status === "not_arranged"
-  ) {
-    return "outline"
-  }
-
-  return "secondary"
+  return `${date.getFullYear()}-${month}-${day}`
 }
 
 export default function OrdersPage() {
   const [mounted, setMounted] = useState(false)
+  const [loadError, setLoadError] = useState("")
   const [orders, setOrders] = useState<LocalOrder[]>([])
+  const [shopNames, setShopNames] = useState<string[]>([])
   const [search, setSearch] = useState("")
-  const [paymentStatus, setPaymentStatus] = useState("all")
-  const [deliveryStatus, setDeliveryStatus] = useState("all")
+  const [payment, setPayment] = useState("all")
+  const [status, setStatus] = useState("all")
+  const [shop, setShop] = useState("all")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
 
   useEffect(() => {
-    const loadOrders = window.setTimeout(() => {
-      setOrders(getStoredOrders())
-      setMounted(true)
-    }, 0)
+    let cancelled = false
 
-    return () => window.clearTimeout(loadOrders)
+    async function load() {
+      try {
+        const [loadedOrders, loadedShops] = await Promise.all([
+          listOrders(),
+          listShops(),
+        ])
+
+        if (cancelled) return
+
+        // Shops come from the shop database. A shop that only appears on an
+        // order is added too, so every order can still be filtered.
+        const names = new Map<string, string>()
+
+        for (const name of [
+          ...loadedShops.map((item) => item.name),
+          ...loadedOrders.map((order) => order.retailerName ?? ""),
+        ]) {
+          const trimmed = name.trim()
+
+          if (trimmed && !names.has(trimmed.toLowerCase())) {
+            names.set(trimmed.toLowerCase(), trimmed)
+          }
+        }
+
+        setOrders(loadedOrders)
+        setShopNames([...names.values()].sort((a, b) => a.localeCompare(b)))
+      } catch (error) {
+        if (!cancelled) setLoadError(messageOf(error, "Could not load orders."))
+      } finally {
+        if (!cancelled) setMounted(true)
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const filteredOrders = useMemo(() => {
     const query = search.trim().toLowerCase()
 
-    return orders.filter((order) => {
-      const matchesSearch =
-        !query ||
-        [
-          order.orderNumber,
-          order.customerName,
-          order.facebookName,
-          order.phone,
-          order.address,
-          order.customerMessageBurmese,
-          order.productSize,
-          order.productColor,
-          order.productDescription,
-          order.productPhotoName,
-          order.orderScreenshotName,
-          order.productName,
-          order.productOption,
-          order.productNote,
-          order.retailerName,
-          order.retailerLineId,
-          order.cargoCompanyName,
-          order.trackingNumber,
-        ]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(query))
+    return orders
+      .filter((order) => {
+        const matchesSearch =
+          !query ||
+          [
+            order.orderNumber,
+            order.customerName,
+            order.facebookName,
+            order.phone,
+            order.productName,
+            order.productOption,
+            order.productColor,
+            order.productSize,
+            order.retailerName,
+          ]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(query))
 
-      const matchesPaymentStatus =
-        paymentStatus === "all" || order.paymentStatus === paymentStatus
+        const matchesPayment =
+          payment === "all" || order.paymentStatus === payment
 
-      const matchesDeliveryStatus =
-        deliveryStatus === "all" || order.deliveryStatus === deliveryStatus
+        const matchesStatus = status === "all" || order.orderStatus === status
 
-      return (
-        matchesSearch &&
-        matchesPaymentStatus &&
-        matchesDeliveryStatus
-      )
-    })
-  }, [orders, search, paymentStatus, deliveryStatus])
+        const matchesShop =
+          shop === "all" ||
+          (order.retailerName ?? "").trim().toLowerCase() === shop.toLowerCase()
+
+        const day = toDateKey(order.createdAt)
+        const matchesDate =
+          (!dateFrom || (day !== "" && day >= dateFrom)) &&
+          (!dateTo || (day !== "" && day <= dateTo))
+
+        return (
+          matchesSearch &&
+          matchesPayment &&
+          matchesStatus &&
+          matchesShop &&
+          matchesDate
+        )
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  }, [orders, search, payment, status, shop, dateFrom, dateTo])
 
   const hasActiveFilters =
-    search || paymentStatus !== "all" || deliveryStatus !== "all"
+    search !== "" ||
+    payment !== "all" ||
+    status !== "all" ||
+    shop !== "all" ||
+    dateFrom !== "" ||
+    dateTo !== ""
 
   function clearFilters() {
     setSearch("")
-    setPaymentStatus("all")
-    setDeliveryStatus("all")
-  }
-
-  function deleteOrder(orderId: string) {
-    const updatedOrders = orders.filter((order) => order.id !== orderId)
-    setOrders(updatedOrders)
-    window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedOrders))
+    setPayment("all")
+    setStatus("all")
+    setShop("all")
+    setDateFrom("")
+    setDateTo("")
   }
 
   if (!mounted) {
@@ -293,6 +220,12 @@ export default function OrdersPage() {
       </header>
 
       <div className="mx-auto w-full max-w-md space-y-4 px-5 py-5">
+        {loadError ? (
+          <Alert variant="destructive" className="rounded-xl">
+            <AlertDescription>{loadError}</AlertDescription>
+          </Alert>
+        ) : null}
+
         <Card className="rounded-[20px] shadow-none">
           <CardContent className="space-y-3 p-4">
             <div className="relative">
@@ -300,46 +233,84 @@ export default function OrdersPage() {
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search customer, product, color, size..."
+                placeholder="Search order ID, customer, shop, product..."
+                aria-label="Search orders"
                 className="h-12 rounded-xl pl-10 text-base"
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-3">
-              <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-                <SelectTrigger className="h-12 rounded-xl">
-                  <SelectValue placeholder="Payment status" />
+            <div className="grid grid-cols-2 gap-3">
+              <Select value={payment} onValueChange={setPayment}>
+                <SelectTrigger className="h-12 w-full rounded-xl" aria-label="Payment">
+                  <SelectValue placeholder="Payment" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All payment statuses</SelectItem>
-                  <SelectItem value="not_paid">Not Paid</SelectItem>
-                  <SelectItem value="receiving">Receiving</SelectItem>
-                  <SelectItem value="deposit_paid">Deposit Paid</SelectItem>
-                  <SelectItem value="partially_paid">Partially Paid</SelectItem>
-                  <SelectItem value="fully_paid">Fully Paid</SelectItem>
-                  <SelectItem value="refunded">Refunded</SelectItem>
+                  <SelectItem value="all">All payments</SelectItem>
+                  {PAYMENT_STATUSES.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {PAYMENT_STATUS_LABELS[key]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
-              <Select value={deliveryStatus} onValueChange={setDeliveryStatus}>
-                <SelectTrigger className="h-12 rounded-xl">
-                  <SelectValue placeholder="Delivery status" />
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="h-12 w-full rounded-xl" aria-label="Order status">
+                  <SelectValue placeholder="Order status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All delivery statuses</SelectItem>
-                  <SelectItem value="not_arranged">Not Arranged</SelectItem>
-                  <SelectItem value="product_bought">
-                    Product Already Bought
-                  </SelectItem>
-                  <SelectItem value="waiting_pickup">Waiting Pickup</SelectItem>
-                  <SelectItem value="picked_up">Picked Up</SelectItem>
-                  <SelectItem value="sent_to_cargo">Sent To Cargo</SelectItem>
-                  <SelectItem value="in_transit">In Transit</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="delayed">Delayed</SelectItem>
-                  <SelectItem value="returned">Returned</SelectItem>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  {ORDER_STATUSES.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {ORDER_STATUS_LABELS[key]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <Select value={shop} onValueChange={setShop}>
+              <SelectTrigger className="h-12 w-full rounded-xl" aria-label="Shop">
+                <SelectValue placeholder="Shop" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All shops</SelectItem>
+                {shopNames.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="orders-date-from" className="text-xs text-muted-foreground">
+                  From
+                </Label>
+                <Input
+                  id="orders-date-from"
+                  type="date"
+                  value={dateFrom}
+                  max={dateTo || undefined}
+                  onChange={(event) => setDateFrom(event.target.value)}
+                  className="h-12 rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="orders-date-to" className="text-xs text-muted-foreground">
+                  To
+                </Label>
+                <Input
+                  id="orders-date-to"
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom || undefined}
+                  onChange={(event) => setDateTo(event.target.value)}
+                  className="h-12 rounded-xl"
+                />
+              </div>
             </div>
 
             {hasActiveFilters ? (
@@ -379,269 +350,54 @@ export default function OrdersPage() {
             </CardContent>
           </Card>
         ) : (
-          <section className="space-y-3">
-            {filteredOrders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                onDelete={() => deleteOrder(order.id)}
-              />
-            ))}
-          </section>
+          <Card className="overflow-hidden rounded-[20px] shadow-none">
+            <ul className="divide-y">
+              {filteredOrders.map((order) => (
+                <OrderRow key={order.id} order={order} />
+              ))}
+            </ul>
+          </Card>
         )}
       </div>
 
-      <BottomNavigation />
+      <BottomNavigation active="orders" />
     </main>
   )
 }
 
-function OrderCard({
-  order,
-  onDelete,
-}: {
-  order: LocalOrder
-  onDelete: () => void
-}) {
-  const rate = order.exchangeRateThbToMmk || 1
-  const customerPayableMmk = order.totalCustomerPayableThb * rate
-  const remainingBalanceMmk = order.remainingBalanceThb * rate
-
+function OrderRow({ order }: { order: LocalOrder }) {
   return (
-    <Card className="rounded-[20px] shadow-none">
-      <CardContent className="space-y-4 p-4">
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">
-            {order.orderNumber} · {formatDate(order.createdAt)}
-          </p>
-
-          <h2 className="mt-1 truncate font-heading text-lg font-medium">
-            {order.customerName}
-          </h2>
-
-          <p className="mt-1 truncate text-sm text-muted-foreground">
-            {order.productName || "Product photo order"}
-            {order.quantity ? ` x ${order.quantity}` : ""}
-            {order.productSize || order.productOption
-              ? ` · Size ${order.productSize || order.productOption}`
-              : ""}
-            {order.productColor ? ` · ${order.productColor}` : ""}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Badge variant={getStatusVariant(order.paymentStatus)}>
-            Payment: {toLabel(order.paymentStatus)}
-          </Badge>
-
-          <Badge variant={getStatusVariant(order.deliveryStatus)}>
-            Delivery: {toLabel(order.deliveryStatus)}
-          </Badge>
-        </div>
-
-        {order.productDescription || order.productNote ? (
-          <div className="rounded-xl border bg-background px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">Description</p>
-            <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm">
-              {order.productDescription || order.productNote}
+    <li>
+      <Link
+        href={`/orders/${order.id}`}
+        className="block px-4 py-3 transition hover:bg-muted/60 active:bg-muted"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">
+              {order.orderNumber} · {formatDate(order.createdAt)}
             </p>
-          </div>
-        ) : null}
-
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl border bg-background px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">Size</p>
-            <p className="mt-0.5 text-sm font-semibold">
-              {order.productSize || order.productOption || "-"}
+            <p className="mt-1 truncate font-medium">{order.customerName}</p>
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">
+              {order.retailerName?.trim() || "No shop"}
             </p>
           </div>
 
-          <div className="rounded-xl border bg-background px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">Color</p>
-            <p className="mt-0.5 truncate text-sm font-semibold">
-              {order.productColor || "-"}
+          <div className="shrink-0 text-right">
+            <p className="font-semibold">
+              {formatBaht(order.totalCustomerPayableThb)}
             </p>
-          </div>
-
-          <div className="rounded-xl border bg-background px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">Phone</p>
-            <p className="mt-0.5 truncate text-sm font-semibold">
-              {order.phone || "-"}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl border bg-background px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">Qty</p>
-            <p className="mt-0.5 text-sm font-semibold">
-              {order.quantity || 1}
-            </p>
-          </div>
-
-          <div className="rounded-xl border bg-background px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">Cost</p>
-            <p className="mt-0.5 text-sm font-semibold">
-              {formatBaht(order.retailerUnitPriceThb || 0)}
-            </p>
-          </div>
-
-          <div className="rounded-xl border bg-background px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">Selling</p>
-            <p className="mt-0.5 text-sm font-semibold">
-              {formatBaht(order.sellingUnitPriceThb || 0)}
-            </p>
-          </div>
-        </div>
-
-        {order.address ? (
-          <div className="rounded-xl border bg-background px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">Location</p>
-            <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm">
-              {order.address}
-            </p>
-          </div>
-        ) : null}
-
-        {order.customerMessageBurmese ? (
-          <div className="rounded-xl border bg-background px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">
-              Customer note
-            </p>
-            <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm">
-              {order.customerMessageBurmese}
-            </p>
-          </div>
-        ) : null}
-
-        {order.productPhotoDataUrl || order.orderScreenshotDataUrl ? (
-          <div className="overflow-hidden rounded-xl border bg-background">
-            <div className="flex items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
-              <IconPhoto className="size-4" />
-              <span className="truncate">
-                {order.productPhotoName ||
-                  order.orderScreenshotName ||
-                  "Product photo"}
-              </span>
-            </div>
-            <Image
-              src={order.productPhotoDataUrl || order.orderScreenshotDataUrl || ""}
-              alt="Customer product photo"
-              width={800}
-              height={800}
-              unoptimized
-              className="max-h-56 w-full object-contain"
-            />
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl border bg-background px-3 py-2">
+            {order.customerCurrency === "MMK" ? (
               <p className="text-[11px] text-muted-foreground">
-                Customer payable
+                {formatKyat(order.totalCustomerPayableThb * getOrderRate(order))}
               </p>
-              <p className="mt-0.5 text-sm font-semibold">
-                {formatBaht(order.totalCustomerPayableThb)}
-              </p>
-              {order.customerCurrency === "MMK" ? (
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {formatKyat(customerPayableMmk)}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="rounded-xl border bg-background px-3 py-2">
-              <p className="text-[11px] text-muted-foreground">Remaining</p>
-              <p className="mt-0.5 text-sm font-semibold">
-                {formatBaht(order.remainingBalanceThb)}
-              </p>
-              {order.customerCurrency === "MMK" ? (
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {formatKyat(remainingBalanceMmk)}
-                </p>
-              ) : null}
-            </div>
+            ) : null}
+            <Badge variant={STATUS_VARIANTS[order.orderStatus]} className="mt-1.5">
+              {ORDER_STATUS_LABELS[order.orderStatus]}
+            </Badge>
           </div>
-        )}
-
-        <div className="grid grid-cols-3 gap-2">
-          <Button asChild variant="outline" className="h-10 rounded-xl px-2">
-            <Link href={`/orders/${order.id}`}>
-              <IconEye className="mr-1 size-4" />
-              View
-            </Link>
-          </Button>
-
-          <Button asChild variant="outline" className="h-10 rounded-xl px-2">
-            <Link href={`/orders/${order.id}`}>
-              <IconWallet className="mr-1 size-4" />
-              Update
-            </Link>
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            className="h-10 rounded-xl px-2 text-destructive hover:text-destructive"
-            onClick={onDelete}
-          >
-            Delete
-          </Button>
         </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function BottomNavigation() {
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 px-4 pb-4 pt-2 backdrop-blur">
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
-        <BottomNavItem href="/dashboard" label="Dashboard">
-          <IconChartBar className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/orders" label="Orders" active>
-          <IconPackage className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/orders/create" label="Add">
-          <IconPlus className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/customers" label="Customers">
-          <IconUsers className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/more" label="More">
-          <IconDots className="size-5" />
-        </BottomNavItem>
-      </div>
-    </nav>
-  )
-}
-
-function BottomNavItem({
-  href,
-  label,
-  active,
-  children,
-}: {
-  href: string
-  label: string
-  active?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <Link
-      href={href}
-      className={
-        active
-          ? "flex flex-col items-center gap-1 rounded-xl bg-primary px-2 py-2 text-primary-foreground"
-          : "flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-muted-foreground"
-      }
-    >
-      {children}
-      <span className="text-[11px] leading-none">{label}</span>
-    </Link>
+      </Link>
+    </li>
   )
 }

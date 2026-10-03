@@ -2,13 +2,16 @@
 "use client"
 
 import { useState } from "react"
-import { IconEye, IconEyeOff, IconLock, IconMail, IconShoppingBag, IconShieldCheck, IconUserPlus } from "@tabler/icons-react"
+import { IconEye, IconEyeOff, IconShoppingBag, IconShieldCheck, IconUserPlus } from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
+
+import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { createClient } from "@/lib/supabase/client"
 
 
 
@@ -25,9 +28,26 @@ export default function LoginPage() {
     e.preventDefault()
     setError("")
     if (!email || !password) { setError("Please enter your email and password."); return }
+    if (!isSupabaseConfigured) {
+      setError("Supabase is not set up. See supabase/README.md.")
+      return
+    }
+
     setLoading(true)
-    // TODO: your auth call here
-    setLoading(false)
+
+    const { error: signInError } = await createClient().auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    })
+
+    if (signInError) {
+      setError(signInError.message)
+      setLoading(false)
+      return
+    }
+
+    router.push("/dashboard")
+    router.refresh()
   }
 
   return (
@@ -53,22 +73,20 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <Label htmlFor="email">Email address</Label>
                 <div className="relative">
-                  <IconMail className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground pointer-events-none" />
                   <Input id="email" type="email" inputMode="email" autoComplete="email"
                     placeholder="you@example.com" value={email}
                     onChange={e => setEmail(e.target.value)}
-                    className="h-12 pl-10 rounded-xl text-base" />
+                    className="h-12 rounded-xl text-base" />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
-                  <IconLock className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground pointer-events-none" />
                   <Input id="password" type={showPw ? "text" : "password"}
                     autoComplete="current-password" placeholder="Enter your password" value={password}
                     onChange={e => setPassword(e.target.value)}
-                    className="h-12 pl-10 pr-12 rounded-xl text-base" />
+                    className="h-12 pr-12 rounded-xl text-base" />
                   <button type="button" onClick={() => setShowPw(v => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-accent transition"
                     aria-label={showPw ? "Hide password" : "Show password"}>

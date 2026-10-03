@@ -2,35 +2,53 @@
 
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { type FormEvent, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
-import {
-  IconArrowLeft,
-  IconChartBar,
-  IconDots,
-  IconPackage,
-  IconPlus,
-  IconUsers,
-} from "@tabler/icons-react"
+import { useParams, useRouter } from "next/navigation"
+import { IconArrowLeft, IconPencil, IconTrash } from "@tabler/icons-react"
 
+import { BottomNavigation } from "@/components/bottom-navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { CustomerForm, type CustomerDraft } from "@/components/customer-form"
 import {
-  getOrdersFromLocalStorage,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
+import {
+  ORDER_STATUS_LABELS,
+  PAYMENT_STATUS_LABELS,
   type LocalOrder,
 } from "../../lib/local-orders"
-import { formatBaht, formatKyat, getOrderRate } from "../../lib/currency"
-
-function getCustomerKey(order: LocalOrder) {
-  const name = order.customerName?.trim().toLowerCase()
-  const facebook = order.facebookName?.trim().toLowerCase()
-  const phone = order.phone?.trim().toLowerCase()
-
-  return phone || facebook || name || order.id
-}
+import {
+  buildCustomerSummaries,
+  getCustomerKey,
+  getOrderCustomerKey,
+  type LocalCustomer,
+} from "../../lib/local-customers"
+import {
+  deleteCustomer,
+  insertCustomer,
+  listCustomers,
+  updateCustomer,
+} from "@/lib/db/customers"
+import { listOrders, updateOrdersCustomer } from "@/lib/db/orders"
+import { messageOf } from "@/lib/db/shared"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { formatBaht, formatKyat } from "../../lib/currency"
 
 function getInitials(value: string) {
   const words = value.trim().split(/\s+/).filter(Boolean)
@@ -57,51 +75,73 @@ function formatDate(value: string) {
   })
 }
 
-function toLabel(value: string) {
-  return value
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-}
-
 function getStatusVariant(
   status: string
 ): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "returned" || status === "delayed" || status === "refunded") {
-    return "destructive"
-  }
+  if (status === "returned" || status === "refunded") return "destructive"
 
-  if (status === "delivered" || status === "fully_paid") {
+  if (status === "complete" || status === "delivered" || status === "fully_paid") {
     return "default"
   }
 
-  if (status === "not_paid" || status === "not_arranged") {
-    return "outline"
-  }
+  if (status === "not_paid" || status === "not_bought") return "outline"
 
   return "secondary"
 }
 
 export default function CustomerDetailsPage() {
+  const router = useRouter()
   const params = useParams<{ key: string }>()
   const customerKey = decodeURIComponent(params.key)
 
   const [mounted, setMounted] = useState(false)
   const [orders, setOrders] = useState<LocalOrder[]>([])
+  const [savedCustomers, setSavedCustomers] = useState<LocalCustomer[]>([])
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<CustomerDraft>({
+    name: "",
+    facebookName: "",
+    phone: "",
+    address: "",
+    otherContacts: "",
+  })
+  const [errorMessage, setErrorMessage] = useState("")
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [pageError, setPageError] = useState("")
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    const loadOrders = window.setTimeout(() => {
-      setOrders(getOrdersFromLocalStorage())
-      setMounted(true)
-    }, 0)
+    let cancelled = false
 
-    return () => window.clearTimeout(loadOrders)
+    async function load() {
+      try {
+        const [loadedOrders, loadedCustomers] = await Promise.all([
+          listOrders(),
+          listCustomers(),
+        ])
+
+        if (cancelled) return
+
+        setOrders(loadedOrders)
+        setSavedCustomers(loadedCustomers)
+      } catch (error) {
+        if (!cancelled) setPageError(messageOf(error, "Could not load the customer."))
+      } finally {
+        if (!cancelled) setMounted(true)
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const customerOrders = useMemo(
     () =>
       orders
-        .filter((order) => getCustomerKey(order) === customerKey)
+        .filter((order) => getOrderCustomerKey(order) === customerKey)
         .sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -109,32 +149,131 @@ export default function CustomerDetailsPage() {
     [customerKey, orders]
   )
 
-  const summary = useMemo(() => {
-    const firstOrder = customerOrders[0]
-    const totalThb = customerOrders.reduce(
-      (sum, order) => sum + (order.totalCustomerPayableThb || 0),
-      0
+  const summary = useMemo(
+    () =>
+      buildCustomerSummaries(savedCustomers, orders).find(
+        (customer) => customer.key === customerKey
+      ),
+    [customerKey, orders, savedCustomers]
+  )
+
+
+  function startEditing() {
+    if (!summary) return
+
+    setDraft({
+      name: summary.name,
+      facebookName: summary.facebookName,
+      phone: summary.phone,
+      address: summary.address,
+      otherContacts: summary.otherContacts,
+    })
+    setErrorMessage("")
+    setEditing(true)
+  }
+
+  async function handleSaveEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!summary) return
+
+    const existing = savedCustomers.find(
+      (customer) => getCustomerKey(customer) === summary.key
     )
-    const totalMmk = customerOrders.reduce(
-      (sum, order) =>
-        sum + (order.totalCustomerPayableThb || 0) * getOrderRate(order),
-      0
-    )
-    const unpaidThb = customerOrders.reduce(
-      (sum, order) => sum + (order.remainingBalanceThb || 0),
-      0
+    const input = {
+      name: draft.name.trim(),
+      facebookName: draft.facebookName.trim(),
+      phone: draft.phone.trim(),
+      address: draft.address.trim(),
+      otherContacts: draft.otherContacts.trim(),
+    }
+    const nextKey = getCustomerKey(input)
+
+    if (
+      savedCustomers.some(
+        (customer) =>
+          customer.id !== existing?.id && getCustomerKey(customer) === nextKey
+      )
+    ) {
+      setErrorMessage("Another customer already uses this phone, Facebook or name.")
+      return
+    }
+
+    setSaving(true)
+
+    let saved: LocalCustomer
+
+    try {
+      saved = existing
+        ? await updateCustomer(existing.id, input)
+        : await insertCustomer(input)
+    } catch (error) {
+      setErrorMessage(messageOf(error, "Could not save the customer."))
+      setSaving(false)
+      return
+    }
+
+    setSavedCustomers((current) =>
+      existing
+        ? current.map((customer) => (customer.id === saved.id ? saved : customer))
+        : [...current, saved]
     )
 
-    return {
-      name: firstOrder?.customerName || "Customer",
-      facebookName: firstOrder?.facebookName || "",
-      phone: firstOrder?.phone || "",
-      address: firstOrder?.address || "",
-      totalThb,
-      totalMmk,
-      unpaidThb,
+    // Orders are linked by phone, Facebook or name, so their copy of the
+    // customer details is updated too and they stay linked after the edit.
+    const orderIds = customerOrders.map((order) => order.id)
+
+    try {
+      await updateOrdersCustomer(orderIds, input)
+    } catch (error) {
+      setErrorMessage(
+        `The customer was saved, but their orders were not updated. ${messageOf(error, "")}`
+      )
+      setSaving(false)
+      return
     }
-  }, [customerOrders])
+
+    setOrders((current) =>
+      current.map((order) =>
+        orderIds.includes(order.id)
+          ? {
+              ...order,
+              customerName: input.name,
+              facebookName: input.facebookName,
+              phone: input.phone,
+              address: input.address,
+            }
+          : order
+      )
+    )
+    setSaving(false)
+    setEditing(false)
+
+    if (nextKey !== summary.key) {
+      router.replace(`/customers/${encodeURIComponent(nextKey)}`)
+    }
+  }
+
+  async function handleDelete() {
+    if (!summary) return
+
+    const existing = savedCustomers.find(
+      (customer) => getCustomerKey(customer) === summary.key
+    )
+
+    setConfirmingDelete(false)
+
+    if (!existing) return
+
+    try {
+      await deleteCustomer(existing.id)
+    } catch (error) {
+      setPageError(messageOf(error, "Could not delete the customer."))
+      return
+    }
+
+    router.push("/customers")
+  }
 
   if (!mounted) {
     return (
@@ -146,7 +285,7 @@ export default function CustomerDetailsPage() {
     )
   }
 
-  if (customerOrders.length === 0) {
+  if (!summary) {
     return (
       <main className="min-h-dvh bg-muted px-5 py-5">
         <div className="mx-auto w-full max-w-md space-y-4">
@@ -162,7 +301,7 @@ export default function CustomerDetailsPage() {
                 Customer not found
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                This customer has no saved orders.
+                This customer is not saved and has no orders.
               </p>
             </CardContent>
           </Card>
@@ -181,16 +320,46 @@ export default function CustomerDetailsPage() {
             </Link>
           </Button>
 
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm text-muted-foreground">Customer</p>
             <h1 className="truncate font-heading text-2xl font-medium tracking-tight">
               {summary.name}
             </h1>
           </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="rounded-xl"
+            aria-label="Edit customer"
+            onClick={startEditing}
+          >
+            <IconPencil className="size-5" />
+          </Button>
+
+          {summary.saved ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="rounded-xl text-destructive hover:text-destructive"
+              aria-label="Delete customer"
+              onClick={() => setConfirmingDelete(true)}
+            >
+              <IconTrash className="size-5" />
+            </Button>
+          ) : null}
         </div>
       </header>
 
       <div className="mx-auto w-full max-w-md space-y-5 px-5 py-5">
+        {pageError ? (
+          <Alert variant="destructive" className="rounded-xl">
+            <AlertDescription>{pageError}</AlertDescription>
+          </Alert>
+        ) : null}
+
         <Card className="rounded-[20px] shadow-none">
           <CardContent className="space-y-4 p-4">
             <div className="flex items-center gap-4">
@@ -210,10 +379,23 @@ export default function CustomerDetailsPage() {
               </div>
             </div>
 
+            {summary.phone && summary.facebookName ? (
+              <p className="text-sm text-muted-foreground">{summary.phone}</p>
+            ) : null}
+
             {summary.address ? (
               <div className="rounded-2xl bg-muted p-3">
-                <p className="text-[11px] text-muted-foreground">Location</p>
-                <p className="mt-1 text-sm">{summary.address}</p>
+                <p className="text-[11px] text-muted-foreground">Address</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm">{summary.address}</p>
+              </div>
+            ) : null}
+
+            {summary.otherContacts ? (
+              <div className="rounded-2xl bg-muted p-3">
+                <p className="text-[11px] text-muted-foreground">Other contacts</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm">
+                  {summary.otherContacts}
+                </p>
               </div>
             ) : null}
 
@@ -238,13 +420,72 @@ export default function CustomerDetailsPage() {
             <Badge variant="secondary">{customerOrders.length}</Badge>
           </div>
 
-          {customerOrders.map((order) => (
-            <CustomerOrderRow key={order.id} order={order} />
-          ))}
+          {customerOrders.length === 0 ? (
+            <Card className="rounded-[20px] shadow-none">
+              <CardContent className="p-5 text-sm text-muted-foreground">
+                No orders yet.
+              </CardContent>
+            </Card>
+          ) : (
+            customerOrders.map((order) => (
+              <CustomerOrderRow key={order.id} order={order} />
+            ))
+          )}
         </section>
       </div>
 
-      <BottomNavigation />
+
+      <Sheet open={editing} onOpenChange={setEditing}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+          <SheetHeader className="border-b">
+            <SheetTitle className="font-heading text-xl">Edit Customer</SheetTitle>
+            <SheetDescription>
+              {summary.saved
+                ? "Saving also updates the details on this customer's orders."
+                : "Saving adds this customer to your saved customers and updates the details on their orders."}
+            </SheetDescription>
+          </SheetHeader>
+
+          <CustomerForm
+            idPrefix="edit-customer"
+            draft={draft}
+            onChange={(key, value) => {
+              setErrorMessage("")
+              setDraft((current) => ({ ...current, [key]: value }))
+            }}
+            onSubmit={handleSaveEdit}
+            submitLabel={saving ? "Saving..." : "Save"}
+            errorMessage={errorMessage}
+          />
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {summary.name}?</DialogTitle>
+            <DialogDescription>
+              {customerOrders.length > 0
+                ? `This removes the saved customer. Their ${customerOrders.length} order${customerOrders.length === 1 ? "" : "s"} stay and the customer still shows in the list because of them.`
+                : "This removes the saved customer."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmingDelete(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDelete}>
+              Delete customer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <BottomNavigation active="customers" />
     </main>
   )
 }
@@ -283,17 +524,17 @@ function CustomerOrderRow({ order }: { order: LocalOrder }) {
                 variant={getStatusVariant(order.paymentStatus)}
                 className="mt-1"
               >
-                {toLabel(order.paymentStatus)}
+                {PAYMENT_STATUS_LABELS[order.paymentStatus]}
               </Badge>
             </div>
 
             <div className="rounded-xl border bg-background px-3 py-2">
-              <p className="text-[11px] text-muted-foreground">Delivery</p>
+              <p className="text-[11px] text-muted-foreground">Order status</p>
               <Badge
-                variant={getStatusVariant(order.deliveryStatus)}
+                variant={getStatusVariant(order.orderStatus)}
                 className="mt-1"
               >
-                {toLabel(order.deliveryStatus)}
+                {ORDER_STATUS_LABELS[order.orderStatus]}
               </Badge>
             </div>
           </div>
@@ -309,59 +550,5 @@ function AmountBox({ label, value }: { label: string; value: string }) {
       <p className="text-[11px] text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-sm font-semibold">{value}</p>
     </div>
-  )
-}
-
-function BottomNavigation() {
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 px-4 pb-4 pt-2 backdrop-blur">
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
-        <BottomNavItem href="/dashboard" label="Dashboard">
-          <IconChartBar className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/orders" label="Orders">
-          <IconPackage className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/orders/create" label="Add">
-          <IconPlus className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/customers" label="Customers" active>
-          <IconUsers className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/more" label="More">
-          <IconDots className="size-5" />
-        </BottomNavItem>
-      </div>
-    </nav>
-  )
-}
-
-function BottomNavItem({
-  href,
-  label,
-  active,
-  children,
-}: {
-  href: string
-  label: string
-  active?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <Link
-      href={href}
-      className={
-        active
-          ? "flex flex-col items-center gap-1 rounded-xl bg-primary px-2 py-2 text-primary-foreground"
-          : "flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-muted-foreground"
-      }
-    >
-      {children}
-      <span className="text-[11px] leading-none">{label}</span>
-    </Link>
   )
 }
