@@ -411,5 +411,6 @@
   "No saved cargo match.": "ကိုက်ညီသော သိမ်းထားသည့် ကာဂို မရှိပါ။",
   "Cargo: {name} (not in your cargo list)": "ကာဂို - {name} (သင့်ကာဂိုစာရင်းတွင် မရှိပါ)",
   "No cargo": "ကာဂို မရှိ",
-  "Choose the cargo company": "ကာဂိုကုမ္ပဏီကို ရွေးပါ"
+  "Choose the cargo company": "ကာဂိုကုမ္ပဏီကို ရွေးပါ",
+  "Unpaid (balance due)": "မပေးရသေးသည် (ကျန်ငွေရှိ)"
 }

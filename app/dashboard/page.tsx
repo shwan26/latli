@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge"
 
 import { type LocalOrder } from "../lib/local-orders"
 import { listOrders } from "@/lib/db/orders"
+import { isUnpaid } from "@/lib/order-filters"
 import { messageOf } from "@/lib/db/shared"
 
 import {
@@ -83,12 +84,7 @@ export default function DashboardPage() {
     const delivered = withStatus("delivered")
     const complete = withStatus("complete")
 
-    const unpaid = orders.filter(
-      (order) =>
-        order.remainingBalanceThb > 0 &&
-        order.paymentStatus !== "fully_paid" &&
-        order.paymentStatus !== "refunded"
-    )
+    const unpaid = orders.filter(isUnpaid)
 
     const refunded = orders.filter(
       (order) => order.paymentStatus === "refunded"
@@ -140,7 +136,7 @@ export default function DashboardPage() {
     const refundThb = (order: LocalOrder) => order.totalPaidThb
 
     return {
-      notBoughtCount: notBought.length,
+      notBoughtCount: withStatus("not_bought").length,
       boughtCount: bought.length,
       sentCargoCount: sentCargo.length,
       deliveredCount: delivered.length,
@@ -201,31 +197,37 @@ export default function DashboardPage() {
             <StatusMiniCard
               title={t("Not bought")}
               value={summary.notBoughtCount}
+              href="/orders?status=not_bought"
               icon={IconShoppingCartOff}
             />
             <StatusMiniCard
               title={t("Bought")}
               value={summary.boughtCount}
+              href="/orders?status=bought"
               icon={IconPackage}
             />
             <StatusMiniCard
               title={t("With cargo")}
               value={summary.sentCargoCount}
+              href="/orders?status=sent_cargo"
               icon={IconTruckDelivery}
             />
             <StatusMiniCard
               title={t("Delivered")}
               value={summary.deliveredCount}
+              href="/orders?status=delivered"
               icon={IconBox}
             />
             <StatusMiniCard
               title={t("Complete")}
               value={summary.completeCount}
+              href="/orders?status=complete"
               icon={IconCircleCheck}
             />
             <StatusMiniCard
               title={t("Unpaid")}
               value={summary.unpaidCount}
+              href="/orders?payment=unpaid"
               icon={IconAlertCircle}
             />
           </div>
@@ -300,7 +302,7 @@ export default function DashboardPage() {
           <DashboardMoneyCard
             title={t("Unpaid")}
             description={`${summary.unpaidCount} ${summary.unpaidCount === 1 ? "order" : "orders"} still have balance`}
-            href="/orders"
+            href="/orders?payment=unpaid"
             icon={IconAlertCircle}
             badge="Action"
             baht={summary.unpaidThb}
@@ -310,7 +312,7 @@ export default function DashboardPage() {
           <DashboardMoneyCard
             title={t("Refund")}
             description={`${summary.refundCount} refunded ${summary.refundCount === 1 ? "order" : "orders"}`}
-            href="/orders"
+            href="/orders?payment=refunded"
             icon={IconArrowBackUp}
             baht={summary.refundThb}
             kyat={summary.refundMmk}
@@ -340,14 +342,16 @@ function ShopLine({ label, count }: { label: string; count: number }) {
 function StatusMiniCard({
   title,
   value,
+  href,
   icon: Icon,
 }: {
   title: string
   value: number
+  href: string
   icon: React.ElementType
 }) {
   return (
-    <Link href="/orders" className="block">
+    <Link href={href} className="block">
       <div className="rounded-[20px] border bg-background p-4 transition active:scale-[0.99]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex size-10 items-center justify-center rounded-2xl bg-muted">

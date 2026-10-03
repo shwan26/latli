@@ -2,8 +2,9 @@
 
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { IconPackage, IconPlus, IconSearch } from "@tabler/icons-react"
 
 import { BottomNavigation } from "@/components/bottom-navigation"
@@ -32,6 +33,11 @@ import {
 } from "../lib/local-orders"
 import { listOrders } from "@/lib/db/orders"
 import { listShops } from "@/lib/db/shops"
+import {
+  isUnpaid,
+  parsePaymentFilter,
+  parseStatusFilter,
+} from "@/lib/order-filters"
 import { messageOf } from "@/lib/db/shared"
 import { useI18n } from "@/lib/i18n/provider"
 import { dateLocale, translate } from "@/lib/i18n/runtime"
@@ -75,13 +81,33 @@ function toDateKey(value: string) {
 export default function OrdersPage() {
   const { t } = useI18n()
 
+  // useSearchParams needs a Suspense boundary for the production build.
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-dvh bg-muted px-5 py-5">
+          <div className="mx-auto w-full max-w-md">
+            <p className="text-sm text-muted-foreground">{t("Loading orders...")}</p>
+          </div>
+        </main>
+      }
+    >
+      <OrdersContent />
+    </Suspense>
+  )
+}
+
+function OrdersContent() {
+  const { t } = useI18n()
+  const params = useSearchParams()
+
   const [mounted, setMounted] = useState(false)
   const [loadError, setLoadError] = useState("")
   const [orders, setOrders] = useState<LocalOrder[]>([])
   const [shopNames, setShopNames] = useState<string[]>([])
   const [search, setSearch] = useState("")
-  const [payment, setPayment] = useState("all")
-  const [status, setStatus] = useState("all")
+  const [payment, setPayment] = useState(() => parsePaymentFilter(params.get("payment")))
+  const [status, setStatus] = useState(() => parseStatusFilter(params.get("status")))
   const [shop, setShop] = useState("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
@@ -151,7 +177,10 @@ export default function OrdersPage() {
             .some((value) => String(value).toLowerCase().includes(query))
 
         const matchesPayment =
-          payment === "all" || order.paymentStatus === payment
+          payment === "all" ||
+          (payment === "unpaid"
+            ? isUnpaid(order)
+            : order.paymentStatus === payment)
 
         const matchesStatus = status === "all" || order.orderStatus === status
 
@@ -248,6 +277,7 @@ export default function OrdersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t("All payments")}</SelectItem>
+                  <SelectItem value="unpaid">{t("Unpaid (balance due)")}</SelectItem>
                   {PAYMENT_STATUSES.map((key) => (
                     <SelectItem key={key} value={key}>
                       {t(PAYMENT_STATUS_LABELS[key])}
