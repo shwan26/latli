@@ -11,7 +11,7 @@ function accountLines(account?: Account) {
 
   return [
     "",
-    "--- Account (please keep this) ---",
+    "--- Latli's Account (please keep this) ---",
     `Email: ${account.email}`,
     ...(account.plan ? [`Plan: ${account.plan}`] : []),
     ...(account.role ? [`Role: ${account.role}`] : []),
@@ -25,9 +25,9 @@ export function supportMailto(kind: "upgrade" | "ticket", account?: Account) {
 
   const lines =
     kind === "upgrade"
-      ? ["Hello, I would like to upgrade to the Pro plan.", ...accountLines(account)]
+      ? ["Hello, I would like to upgrade to the Pro plan of Latli.", ...accountLines(account)]
       : [
-          "What happened:",
+          "Hello, I need help with a support ticket for Latli.",
           "",
           "What you expected:",
           "",

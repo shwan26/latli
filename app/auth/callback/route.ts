@@ -19,7 +19,16 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
-    if (!error) return NextResponse.redirect(`${origin}${next}`)
+    if (!error) {
+      if (next === "/reset-password") {
+        return NextResponse.redirect(`${origin}${next}`)
+      }
+
+      // Email confirmed. End the session the link just created so the user
+      // signs in themselves.
+      await supabase.auth.signOut()
+      return NextResponse.redirect(`${origin}/login?confirmed=1`)
+    }
   }
 
   return NextResponse.redirect(

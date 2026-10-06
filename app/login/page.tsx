@@ -1,7 +1,7 @@
 // app/login/page.tsx
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { IconEye, IconEyeOff, IconShieldCheck, IconUserPlus } from "@tabler/icons-react"
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
@@ -18,6 +18,18 @@ import { useI18n } from "@/lib/i18n/provider"
 import { LanguageSwitch } from "@/components/language-switch"
 
 
+
+function ConfirmedNotice() {
+  const { t } = useI18n()
+
+  if (useSearchParams().get("confirmed") !== "1") return null
+
+  return (
+    <Alert className="rounded-xl">
+      <AlertDescription>{t("Email confirmed. Log in to continue")}</AlertDescription>
+    </Alert>
+  )
+}
 
 export default function LoginPage() {
   const { t } = useI18n()
@@ -84,6 +96,9 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent className="px-6 pb-6 pt-5">
             <form onSubmit={handleLogin} className="space-y-5">
+              <Suspense fallback={null}>
+                <ConfirmedNotice />
+              </Suspense>
               {error && <Alert variant="destructive" className="rounded-xl"><AlertDescription>{error}</AlertDescription></Alert>}
 
               <div className="space-y-2">

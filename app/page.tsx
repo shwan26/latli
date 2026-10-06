@@ -1,4 +1,3 @@
-import Image from "next/image"
 import Link from "next/link"
 import {
   IconArrowRight,
@@ -10,7 +9,7 @@ import {
   IconUsers,
 } from "@tabler/icons-react"
 
-import { LanguageSwitch } from "@/components/language-switch"
+import { PublicNavbar } from "@/components/public-navbar"
 import { LandingPhonePreview } from "@/components/landing-phone-preview"
 import { Button } from "@/components/ui/button"
 import { getI18n } from "@/lib/i18n/server"
@@ -34,27 +33,7 @@ export default async function Home() {
 
   return (
     <main className="min-h-dvh bg-[#f7f4ee] text-[#171512]">
-      <header className="border-b border-[#ded6c9] bg-[#fbfaf7]/90 px-5 py-4 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-3">
-            <Image
-              src="/logo.png"
-              alt={t("Latli")}
-              width={644}
-              height={434}
-              priority
-              className="h-11 w-auto"
-            />
-          </Link>
-
-          <div className="flex items-center gap-3">
-            <LanguageSwitch />
-          <Button asChild className="h-10 rounded-lg px-5 tracking-normal">
-            <Link href="/login">{t("Login")}</Link>
-          </Button>
-          </div>
-        </div>
-      </header>
+      <PublicNavbar />
 
       <section className="border-b border-[#ded6c9] bg-[#fbfaf7] px-5">
         <div className="mx-auto grid min-h-[calc(100dvh-73px)] w-full max-w-6xl items-center gap-10 py-12 md:grid-cols-[0.95fr_1.05fr] md:py-16">
