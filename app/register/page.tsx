@@ -143,14 +143,16 @@ export default function CreateAccountPage() {
           <LanguageSwitch />
         </div>
         <div className="mb-8 text-center">
-          <Image
-            src="/logo.png"
-            alt=""
-            width={644}
-            height={434}
-            priority
-            className="mx-auto mb-3 h-16 w-auto"
-          />
+          <Link href="/" aria-label={t("Latli")} className="mx-auto mb-3 block w-fit">
+            <Image
+              src="/logo.png"
+              alt=""
+              width={644}
+              height={434}
+              priority
+              className="h-16 w-auto"
+            />
+          </Link>
 
           <h1 className="sr-only">{t("Latli")}</h1>
 

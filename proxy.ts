@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { isSupabaseConfigured, supabaseKey, supabaseUrl } from "@/lib/supabase/env"
 
 // Pages anyone can open. Everything else needs a signed-in account.
-const PUBLIC_PATHS = ["/login", "/register", "/auth", "/terms", "/privacy"]
+const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/auth", "/terms", "/privacy"]
 const AUTH_PAGES = ["/login", "/register"]
 
 function isPublicPath(pathname: string) {
