@@ -29,16 +29,14 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 
-import { type LocalOrder } from "../lib/local-orders"
+import { type Currency, type LocalOrder } from "../lib/local-orders"
 import { listOrders } from "@/lib/db/orders"
+import { canUseSecondCurrency, fetchProfile } from "@/lib/profile"
+import { createClient } from "@/lib/supabase/client"
 import { isUnpaid } from "@/lib/order-filters"
 import { messageOf } from "@/lib/db/shared"
 
-import {
-  formatBaht,
-  formatKyat,
-  getOrderRate,
-} from "../lib/currency"
+import { formatMoney, getOrderRate } from "../lib/currency"
 import { useI18n } from "@/lib/i18n/provider"
 import { translate } from "@/lib/i18n/runtime"
 
@@ -48,15 +46,29 @@ export default function DashboardPage() {
   const [orders, setOrders] = useState<LocalOrder[]>([])
   const [mounted, setMounted] = useState(false)
   const [loadError, setLoadError] = useState("")
+  const [baseCurrency, setBaseCurrency] = useState<Currency>("MMK")
+  const [profileSecond, setProfileSecond] = useState<Currency | null>(null)
 
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       try {
-        const loaded = await listOrders()
+        const [loaded, profile] = await Promise.all([
+          listOrders(),
+          fetchProfile(createClient()),
+        ])
 
-        if (!cancelled) setOrders(loaded)
+        if (!cancelled) {
+          setOrders(loaded)
+
+          if (profile) {
+            setBaseCurrency(profile.baseCurrency)
+            setProfileSecond(
+              canUseSecondCurrency(profile) ? profile.secondaryCurrency : null
+            )
+          }
+        }
       } catch (error) {
         if (!cancelled) setLoadError(messageOf(error, translate("Could not load orders.")))
       } finally {
@@ -70,6 +82,18 @@ export default function DashboardPage() {
       cancelled = true
     }
   }, [])
+
+  // Pro accounts show their second currency. Free accounts only show one, but
+  // keep showing the old customer currency when they already have orders in it.
+  const secondCurrency = useMemo<Currency | null>(() => {
+    if (profileSecond) return profileSecond
+
+    const legacy = orders.find(
+      (order) => order.customerCurrency !== order.baseCurrency
+    )
+
+    return legacy?.customerCurrency ?? null
+  }, [orders, profileSecond])
 
   const summary = useMemo(() => {
     const withStatus = (status: LocalOrder["orderStatus"]) =>
@@ -281,41 +305,49 @@ export default function DashboardPage() {
           <h2 className="font-heading text-lg font-medium">{t("Money")}</h2>
 
           <DashboardMoneyCard
+            baseCurrency={baseCurrency}
+            secondCurrency={secondCurrency}
             title={t("Total sales")}
             description={t("Customer payable, refunds excluded")}
             href="/orders"
             icon={IconChartBar}
-            baht={summary.totalSalesThb}
-            kyat={summary.totalSalesMmk}
+            base={summary.totalSalesThb}
+            second={summary.totalSalesMmk}
           />
 
           <DashboardMoneyCard
+            baseCurrency={baseCurrency}
+            secondCurrency={secondCurrency}
             title={t("Profit")}
             description={t("Owner only")}
             href="/orders"
             icon={IconWallet}
             badge="Owner"
-            baht={summary.profitThb}
-            kyat={summary.profitMmk}
+            base={summary.profitThb}
+            second={summary.profitMmk}
           />
 
           <DashboardMoneyCard
+            baseCurrency={baseCurrency}
+            secondCurrency={secondCurrency}
             title={t("Unpaid")}
             description={`${summary.unpaidCount} ${summary.unpaidCount === 1 ? "order" : "orders"} still have balance`}
             href="/orders?payment=unpaid"
             icon={IconAlertCircle}
             badge="Action"
-            baht={summary.unpaidThb}
-            kyat={summary.unpaidMmk}
+            base={summary.unpaidThb}
+            second={summary.unpaidMmk}
           />
 
           <DashboardMoneyCard
+            baseCurrency={baseCurrency}
+            secondCurrency={secondCurrency}
             title={t("Refund")}
             description={`${summary.refundCount} refunded ${summary.refundCount === 1 ? "order" : "orders"}`}
             href="/orders?payment=refunded"
             icon={IconArrowBackUp}
-            baht={summary.refundThb}
-            kyat={summary.refundMmk}
+            base={summary.refundThb}
+            second={summary.refundMmk}
           />
         </section>
 
@@ -371,19 +403,21 @@ function DashboardMoneyCard({
   href,
   icon: Icon,
   badge,
-  baht,
-  kyat,
+  base,
+  second,
+  baseCurrency,
+  secondCurrency,
 }: {
   title: string
   description: string
   href: string
   icon: React.ElementType
   badge?: string
-  baht: number
-  kyat: number
+  base: number
+  second: number
+  baseCurrency: Currency
+  secondCurrency: Currency | null
 }) {
-  const { t } = useI18n()
-
   return (
     <Link href={href} className="block">
       <Card className="rounded-[20px] shadow-none transition active:scale-[0.99]">
@@ -411,18 +445,20 @@ function DashboardMoneyCard({
 
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <div className="rounded-xl border bg-background px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">{t("Baht")}</p>
+                  <p className="text-[11px] text-muted-foreground">{baseCurrency}</p>
                   <p className="mt-0.5 text-sm font-semibold">
-                    {formatBaht(baht)}
+                    {formatMoney(base, baseCurrency)}
                   </p>
                 </div>
 
-                <div className="rounded-xl border bg-background px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">{t("Kyat")}</p>
-                  <p className="mt-0.5 text-sm font-semibold">
-                    {formatKyat(kyat)}
-                  </p>
-                </div>
+                {secondCurrency ? (
+                  <div className="rounded-xl border bg-background px-3 py-2">
+                    <p className="text-[11px] text-muted-foreground">{secondCurrency}</p>
+                    <p className="mt-0.5 text-sm font-semibold">
+                      {formatMoney(second, secondCurrency)}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

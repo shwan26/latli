@@ -51,6 +51,7 @@ import {
   type LocalShopProduct,
 } from "../lib/local-shops"
 import { resizeImageToDataUrl } from "../lib/image-resize"
+import { formatMoney } from "../lib/currency"
 import {
   getPhotoExpiry,
   getPhotoUrls,
@@ -93,14 +94,6 @@ const emptyProductDraft: ProductDraft = {
 function toNumber(value: string) {
   const number = Number(value)
   return Number.isFinite(number) ? number : 0
-}
-
-function formatBaht(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "THB",
-    maximumFractionDigits: 0,
-  }).format(value)
 }
 
 export default function ShopsPage() {
@@ -749,7 +742,7 @@ function ShopDetail({
                     </p>
                   ) : null}
                   <p className="mt-0.5 text-muted-foreground">
-                    {formatBaht(product.priceThb)}
+                    {formatMoney(product.priceThb, account?.baseCurrency ?? "THB")}
                   </p>
                   {product.imagePath && photoExpiry[product.imagePath] ? (
                     <p className="mt-0.5 text-[11px] text-muted-foreground">

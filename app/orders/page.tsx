@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-import { formatBaht, formatKyat, getOrderRate } from "../lib/currency"
+import { formatMoney, getOrderRate } from "../lib/currency"
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUSES,
@@ -407,11 +407,14 @@ function OrderRow({ order }: { order: LocalOrder }) {
 
           <div className="shrink-0 text-right">
             <p className="font-semibold">
-              {formatBaht(order.totalCustomerPayableThb)}
+              {formatMoney(order.totalCustomerPayableThb, order.baseCurrency)}
             </p>
-            {order.customerCurrency === "MMK" ? (
+            {order.customerCurrency !== order.baseCurrency ? (
               <p className="text-[11px] text-muted-foreground">
-                {formatKyat(order.totalCustomerPayableThb * getOrderRate(order))}
+                {formatMoney(
+                  order.totalCustomerPayableThb * getOrderRate(order),
+                  order.customerCurrency
+                )}
               </p>
             ) : null}
             <Badge variant={STATUS_VARIANTS[order.orderStatus]} className="mt-1.5">

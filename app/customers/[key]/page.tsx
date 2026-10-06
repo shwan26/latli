@@ -48,7 +48,7 @@ import {
 import { listOrders, updateOrdersCustomer } from "@/lib/db/orders"
 import { messageOf } from "@/lib/db/shared"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { formatBaht, formatKyat } from "../../lib/currency"
+import { formatMoney } from "../../lib/currency"
 import { useI18n } from "@/lib/i18n/provider"
 import { dateLocale, translate } from "@/lib/i18n/runtime"
 
@@ -398,11 +398,19 @@ export default function CustomerDetailsPage() {
             ) : null}
 
             <div className="grid grid-cols-2 gap-3">
-              <AmountBox label={t("Total")} value={formatBaht(summary.totalThb)} />
-              <AmountBox label={t("MMK")} value={formatKyat(summary.totalMmk)} />
+              <AmountBox
+                label={t("Total")}
+                value={formatMoney(summary.totalThb, summary.baseCurrency)}
+              />
+              {summary.customerCurrency !== summary.baseCurrency ? (
+                <AmountBox
+                  label={summary.customerCurrency}
+                  value={formatMoney(summary.totalMmk, summary.customerCurrency)}
+                />
+              ) : null}
               <AmountBox
                 label={t("Unpaid")}
-                value={formatBaht(summary.unpaidThb)}
+                value={formatMoney(summary.unpaidThb, summary.baseCurrency)}
               />
               <AmountBox
                 label={t("Orders")}
@@ -507,7 +515,7 @@ function CustomerOrderRow({ order }: { order: LocalOrder }) {
             </div>
 
             <p className="shrink-0 text-sm font-semibold">
-              {formatBaht(order.totalCustomerPayableThb)}
+              {formatMoney(order.totalCustomerPayableThb, order.baseCurrency)}
             </p>
           </div>
 

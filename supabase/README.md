@@ -44,7 +44,7 @@ Follow the steps in order. It takes about 10 minutes.
 
 ## 3. Create the tables
 
-Open **SQL Editor > New query**. Run these five files **in this order**, one
+Open **SQL Editor > New query**. Run these six files **in this order**, one
 after the other (paste the whole file, then press Run):
 
 1. `supabase/migrations/20261003000000_profiles.sql`
@@ -71,6 +71,13 @@ after the other (paste the whole file, then press Run):
 5. `supabase/migrations/20261004000000_order_cargo.sql`
    Adds the cargo company to orders. Run it before using the Cargo card on
    the order page.
+
+6. `supabase/migrations/20261005000000_currency_settings.sql`
+   Adds the primary currency (MMK until the user changes it in Settings), and
+   the Pro-only second currency with a default exchange rate, to `profiles`,
+   and `base_currency` to `orders`. Free accounts cannot set a second currency
+   (the database refuses it). The `*_thb` order columns are legacy names: they
+   hold amounts in the order's base currency.
 
 Each file should end with "Success. No rows returned". Run each file only once.
 If one fails halfway, tell me the error message instead of running it again.

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import {
   Geist,
   Geist_Mono,
@@ -59,6 +60,18 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <I18nProvider initialLang={lang}>{children}</I18nProvider>
       </body>
+      <Script
+        src="https://www.googletagmanager.com/gtag/js?id=G-5R839METG7"
+        strategy="afterInteractive"
+      />
+      <Script id="google-analytics" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-5R839METG7');
+        `}
+      </Script>
     </html>
   );
 }

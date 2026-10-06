@@ -15,6 +15,7 @@ type OrderRow = {
   address: string
   order_status: OrderStatus
   payment_status: PaymentStatus
+  base_currency: LocalOrder["baseCurrency"]
   customer_currency: LocalOrder["customerCurrency"]
   exchange_rate_thb_to_mmk: number
   total_retailer_cost_thb: number
@@ -57,7 +58,7 @@ function fromRow(row: OrderRow): LocalOrder {
     address: row.address,
     orderStatus: row.order_status,
     paymentStatus: row.payment_status,
-    baseCurrency: "THB",
+    baseCurrency: row.base_currency,
     customerCurrency: row.customer_currency,
     exchangeRateThbToMmk: Number(row.exchange_rate_thb_to_mmk),
     totalRetailerCostThb: Number(row.total_retailer_cost_thb),
@@ -94,6 +95,7 @@ function toColumns(order: OrderInput) {
     address: order.address ?? "",
     order_status: order.orderStatus,
     payment_status: order.paymentStatus,
+    base_currency: order.baseCurrency,
     customer_currency: order.customerCurrency,
     exchange_rate_thb_to_mmk: order.exchangeRateThbToMmk,
     total_retailer_cost_thb: order.totalRetailerCostThb,

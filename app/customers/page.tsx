@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { formatBaht } from "../lib/currency"
+import { formatMoney } from "../lib/currency"
 import {
   buildCustomerSummaries,
   type CustomerSummary,
@@ -210,7 +210,7 @@ function CustomerRow({ customer }: { customer: CustomerSummary }) {
             {t(customer.orderCount === 1 ? "{count} order" : "{count} orders", { count: customer.orderCount })}
           </p>
         </div>
-        <p className="shrink-0 font-semibold">{formatBaht(customer.totalThb)}</p>
+        <p className="shrink-0 font-semibold">{formatMoney(customer.totalThb, customer.baseCurrency)}</p>
       </Link>
     </li>
   )

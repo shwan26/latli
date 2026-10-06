@@ -65,6 +65,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
 import { messageOf } from "@/lib/db/shared"
 import { resizeImageToDataUrl } from "../../lib/image-resize"
+import { formatMoney } from "../../lib/currency"
 import { useI18n } from "@/lib/i18n/provider"
 import { dateLocale, translate } from "@/lib/i18n/runtime"
 import { RichText } from "@/components/rich-text"
@@ -72,10 +73,6 @@ import { RichText } from "@/components/rich-text"
 function toNumber(value: string) {
   const number = Number(value)
   return Number.isFinite(number) ? number : 0
-}
-
-function formatBaht(value: number) {
-  return `฿${Math.round(value || 0).toLocaleString("en-US")}`
 }
 
 // Required fields from top to bottom, for moving to the first problem.
@@ -859,7 +856,7 @@ export default function OrderDetailsPage() {
               />
               <TextInput
                 id="costPriceThb"
-                label={t("Cost price (฿)")}
+                label={t("Cost price (฿)").replace("฿", order.baseCurrency)}
                 value={costPriceThb}
                 onChange={(value) => {
                 setCostPriceThb(value)
@@ -873,7 +870,7 @@ export default function OrderDetailsPage() {
             </div>
             <TextInput
               id="sellingPriceThb"
-              label={t("Selling price (฿)")}
+              label={t("Selling price (฿)").replace("฿", order.baseCurrency)}
               value={sellingPriceThb}
               onChange={(value) => {
                 setSellingPriceThb(value)
@@ -888,13 +885,17 @@ export default function OrderDetailsPage() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <SummaryItem
                   label={t("Customer total")}
-                  value={formatBaht(toNumber(sellingPriceThb) * toNumber(quantity))}
+                  value={formatMoney(
+                    toNumber(sellingPriceThb) * toNumber(quantity),
+                    order.baseCurrency
+                  )}
                 />
                 <SummaryItem
                   label={t("Profit")}
-                  value={formatBaht(
+                  value={formatMoney(
                     (toNumber(sellingPriceThb) - toNumber(costPriceThb)) *
-                      toNumber(quantity)
+                      toNumber(quantity),
+                    order.baseCurrency
                   )}
                 />
               </div>

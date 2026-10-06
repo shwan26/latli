@@ -412,5 +412,16 @@
   "Cargo: {name} (not in your cargo list)": "ကာဂို - {name} (သင့်ကာဂိုစာရင်းတွင် မရှိပါ)",
   "No cargo": "ကာဂို မရှိ",
   "Choose the cargo company": "ကာဂိုကုမ္ပဏီကို ရွေးပါ",
-  "Unpaid (balance due)": "မပေးရသေးသည် (ကျန်ငွေရှိ)"
+  "Unpaid (balance due)": "မပေးရသေးသည် (ကျန်ငွေရှိ)",
+  "Primary currency": "အဓိကငွေကြေး",
+  "Second currency": "ဒုတိယငွေကြေး",
+  "None": "မရှိ",
+  "Default exchange rate": "ပုံသေ ငွေလဲနှုန်း",
+  "Exchange rate": "ငွေလဲနှုန်း",
+  "Pick two different currencies.": "မတူညီသော ငွေကြေးနှစ်မျိုး ရွေးပါ။",
+  "Enter an exchange rate greater than 0.": "၀ ထက်ကြီးသော ငွေလဲနှုန်း ထည့်ပါ။",
+  "A second currency with an exchange rate is a Pro feature.": "ဒုတိယငွေကြေးနှင့် ငွေလဲနှုန်းသည် ပရို လုပ်ဆောင်ချက် ဖြစ်သည်။",
+  "Currency": "ငွေကြေး",
+  "Save currency": "ငွေကြေး သိမ်းမည်",
+  "Saved": "သိမ်းပြီးပြီ"
 }

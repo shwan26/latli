@@ -1,6 +1,8 @@
 // Order types and the status options used across the app.
 
-export type Currency = "THB" | "MMK"
+export const CURRENCIES = ["THB", "MMK", "USD", "SGD", "CNY", "MYR", "JPY"] as const
+
+export type Currency = (typeof CURRENCIES)[number]
 
 export type OrderStatus =
   | "not_bought"
@@ -43,7 +45,9 @@ export type LocalOrder = {
   orderStatus: OrderStatus
   paymentStatus: PaymentStatus
 
-  baseCurrency: "THB"
+  // The *Thb money fields below are legacy names: they hold amounts in
+  // baseCurrency. exchangeRateThbToMmk means 1 baseCurrency = N customerCurrency.
+  baseCurrency: Currency
   customerCurrency: Currency
   exchangeRateThbToMmk: number
 

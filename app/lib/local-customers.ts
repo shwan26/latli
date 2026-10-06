@@ -1,4 +1,5 @@
 import { getOrderRate } from "./currency"
+import type { Currency } from "./local-orders"
 import type { LocalOrder } from "./local-orders"
 
 export type LocalCustomer = {
@@ -32,6 +33,10 @@ export type CustomerSummary = {
   totalThb: number
   totalMmk: number
   unpaidThb: number
+  // Currencies of the customer's latest order. totalThb and unpaidThb are in
+  // baseCurrency, totalMmk is in customerCurrency (legacy field names).
+  baseCurrency: Currency
+  customerCurrency: Currency
   lastOrderAt: string
   createdAt: string
 }
@@ -85,6 +90,8 @@ export function buildCustomerSummaries(
       totalThb: 0,
       totalMmk: 0,
       unpaidThb: 0,
+      baseCurrency: "THB",
+      customerCurrency: "MMK",
       lastOrderAt: "",
       createdAt: customer.createdAt,
     })
@@ -107,6 +114,8 @@ export function buildCustomerSummaries(
         totalThb: 0,
         totalMmk: 0,
         unpaidThb: 0,
+        baseCurrency: "THB",
+        customerCurrency: "MMK",
         lastOrderAt: "",
         createdAt: order.createdAt,
       } satisfies CustomerSummary)
@@ -117,6 +126,8 @@ export function buildCustomerSummaries(
     summary.totalThb += totalThb
     summary.totalMmk += totalThb * getOrderRate(order)
     summary.unpaidThb += order.remainingBalanceThb || 0
+    summary.baseCurrency = order.baseCurrency
+    summary.customerCurrency = order.customerCurrency
 
     if (
       !summary.lastOrderAt ||

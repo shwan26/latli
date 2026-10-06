@@ -27,7 +27,8 @@ import { UpgradeLink } from "@/components/upgrade-link"
 import { supportMailto } from "@/lib/support"
 import { countCargo } from "@/lib/db/cargo"
 import { useI18n } from "@/lib/i18n/provider"
-import { LanguageSwitch } from "@/components/language-switch"
+import { LanguageSelect } from "@/components/language-select"
+import { CurrencySettings } from "@/components/currency-settings"
 import { RichText } from "@/components/rich-text"
 
 function getInitials(value: string) {
@@ -137,8 +138,9 @@ export default function MorePage() {
           <CardContent className="space-y-3">
             <div className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border bg-background px-3 py-3">
               <span className="text-sm font-medium">{t("Language")}</span>
-              <LanguageSwitch />
+              <LanguageSelect />
             </div>
+            <CurrencySettings profile={profile} onSaved={setProfile} />
             <SettingsLink
               href="/profile"
               title={t("Profile")}

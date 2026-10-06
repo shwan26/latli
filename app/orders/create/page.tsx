@@ -22,7 +22,8 @@ import { SearchPicker } from "@/components/search-picker"
 import { FieldError, RequiredMark } from "@/components/field-error"
 import { UpgradeLink } from "@/components/upgrade-link"
 import { focusFirstError } from "@/lib/form-errors"
-import { canUseGemini, fetchProfile } from "@/lib/profile"
+import { canUseGemini, canUseSecondCurrency, fetchProfile } from "@/lib/profile"
+import { type Currency } from "../../lib/local-orders"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -86,6 +87,7 @@ const FIELD_ORDER = [
   "quantity",
   "costPriceThb",
   "sellingPriceThb",
+  "exchangeRate",
 ]
 
 type PickMode = "existing" | "new"
@@ -199,6 +201,11 @@ export default function CreateOrderPage() {
   const [productPhotoPreview, setProductPhotoPreview] = useState("")
   const [readStatus, setReadStatus] = useState("")
   const [useGemini, setUseGemini] = useState(false)
+  const [baseCurrency, setBaseCurrency] = useState<Currency>("MMK")
+  // Pro accounts with a second currency charge the customer in it. Everyone
+  // else charges in the primary currency at a rate of 1.
+  const [secondCurrency, setSecondCurrency] = useState<Currency | null>(null)
+  const [exchangeRate, setExchangeRate] = useState("")
 
   useEffect(() => {
     let cancelled = false
@@ -235,7 +242,17 @@ export default function CreateOrderPage() {
         ? await fetchProfile(createClient())
         : null
 
-      if (!cancelled && profile) setUseGemini(canUseGemini(profile))
+      if (cancelled || !profile) return
+
+      setUseGemini(canUseGemini(profile))
+      setBaseCurrency(profile.baseCurrency)
+
+      if (canUseSecondCurrency(profile) && profile.secondaryCurrency) {
+        setSecondCurrency(profile.secondaryCurrency)
+        setExchangeRate(
+          profile.defaultExchangeRate ? String(profile.defaultExchangeRate) : ""
+        )
+      }
     }
 
     void loadRecords()
@@ -497,6 +514,10 @@ export default function CreateOrderPage() {
       problems.costPriceThb = t("Enter the cost price.")
     }
 
+    if (secondCurrency && !(Number(exchangeRate) > 0)) {
+      problems.exchangeRate = t("Enter an exchange rate greater than 0.")
+    }
+
     if (sellingPriceThb.trim() === "" || !(Number(sellingPriceThb) > 0)) {
       problems.sellingPriceThb = t("Enter a selling price above 0.")
     }
@@ -634,9 +655,9 @@ export default function CreateOrderPage() {
         orderStatus,
         paymentStatus,
 
-        baseCurrency: "THB",
-        customerCurrency: "MMK",
-        exchangeRateThbToMmk: 1,
+        baseCurrency,
+        customerCurrency: secondCurrency ?? baseCurrency,
+        exchangeRateThbToMmk: secondCurrency ? toNumber(exchangeRate) : 1,
 
         totalRetailerCostThb,
         totalCustomerPayableThb,
@@ -1059,7 +1080,7 @@ export default function CreateOrderPage() {
               />
               <TextField
                 id="costPriceThb"
-                label={t("Cost price (฿)")}
+                label={t("Cost price (฿)").replace("฿", baseCurrency)}
                 type="number"
                 inputMode="decimal"
                 min="0"
@@ -1076,7 +1097,7 @@ export default function CreateOrderPage() {
 
             <TextField
               id="sellingPriceThb"
-              label={t("Selling price (฿)")}
+              label={t("Selling price (฿)").replace("฿", baseCurrency)}
               type="number"
               inputMode="decimal"
               min="0"
@@ -1089,6 +1110,24 @@ export default function CreateOrderPage() {
               error={fieldErrors.sellingPriceThb}
               placeholder="0"
             />
+
+            {secondCurrency ? (
+              <TextField
+                id="exchangeRate"
+                label={`${t("Exchange rate")} (1 ${baseCurrency} = ? ${secondCurrency})`}
+                type="number"
+                inputMode="decimal"
+                min="0"
+                value={exchangeRate}
+                onChange={(value) => {
+                  setExchangeRate(value)
+                  clearFieldError("exchangeRate")
+                }}
+                required
+                error={fieldErrors.exchangeRate}
+                placeholder="0"
+              />
+            ) : null}
 
             <div className="space-y-2">
               <Label htmlFor="customerMessage">{t("Customer note")}</Label>
@@ -1133,7 +1172,7 @@ export default function CreateOrderPage() {
             {paymentStatus === "partially_paid" ? (
               <TextField
                 id="amountPaidThb"
-                label={t("Amount paid so far (฿)")}
+                label={t("Amount paid so far (฿)").replace("฿", baseCurrency)}
                 type="number"
                 inputMode="decimal"
                 min="0"
