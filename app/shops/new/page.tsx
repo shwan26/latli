@@ -36,7 +36,7 @@ export default function AddShopPage() {
     event.preventDefault()
 
     if (!draft.name.trim() || !draft.phone.trim() || !draft.location.trim()) {
-      setErrorMessage(t("Fill in the shop name, phone or LINE, and location."))
+      setErrorMessage(t("Fill in the shop name, phone or LINE, and location"))
       return
     }
 
@@ -46,7 +46,7 @@ export default function AddShopPage() {
       await insertShop({ ...draft, name: draft.name.trim() })
       router.push("/shops")
     } catch (error) {
-      setErrorMessage(messageOf(error, t("Could not save the shop.")))
+      setErrorMessage(messageOf(error, t("Could not save the shop")))
       setSaving(false)
     }
   }
@@ -77,7 +77,7 @@ export default function AddShopPage() {
           <RequiredMark /> {t("required")}
         </p>
         <p className="text-sm text-muted-foreground">
-          {t("Products can be added after the shop is saved.")}
+          {t("Products can be added after the shop is saved")}
         </p>
 
         <div className="space-y-2">

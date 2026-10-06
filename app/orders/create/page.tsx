@@ -122,10 +122,10 @@ function readFileAsDataUrl(file: File) {
         return
       }
 
-      reject(new Error(translate("Invalid image file.")))
+      reject(new Error(translate("Invalid image file")))
     }
 
-    reader.onerror = () => reject(new Error(translate("Could not read image file.")))
+    reader.onerror = () => reject(new Error(translate("Could not read image file")))
     reader.readAsDataURL(file)
   })
 }
@@ -146,7 +146,7 @@ async function readOrderWithGemini(file: File): Promise<ExtractedOrder> {
   } | null
 
   if (!response.ok || !result?.data) {
-    throw new Error(translate(result?.error || "Gemini could not read this image."))
+    throw new Error(translate(result?.error || "Gemini could not read this image"))
   }
 
   return result.data
@@ -230,7 +230,7 @@ export default function CreateOrderPage() {
         if (loadedShops.length === 0) setShopMode("new")
       } catch (caughtLoadError) {
         if (!cancelled) {
-          setLoadError(messageOf(caughtLoadError, translate("Could not load your customers and shops.")))
+          setLoadError(messageOf(caughtLoadError, translate("Could not load your customers and shops")))
         }
       }
     }
@@ -317,7 +317,7 @@ export default function CreateOrderPage() {
     if (match && !customerTouchedRef.current) {
       setSelectedCustomerKey(match.key)
       setCustomerMode("existing")
-      return t("Matched saved customer {name}.", { name: match.name })
+      return t("Matched saved customer {name}", { name: match.name })
     }
 
     return ""
@@ -338,7 +338,7 @@ export default function CreateOrderPage() {
     if (!file) return
 
     if (!file.type.startsWith("image/")) {
-      setError(t("Please upload an image."))
+      setError(t("Please upload an image"))
       setScreenshotFile(null)
       event.target.value = ""
       return
@@ -349,7 +349,7 @@ export default function CreateOrderPage() {
     try {
       screenshotDataUrl = await readFileAsDataUrl(file)
     } catch {
-      setError(t("Could not preview the image. Please choose another image."))
+      setError(t("Could not preview the image. Please choose another image"))
       setScreenshotFile(null)
       event.target.value = ""
       return
@@ -403,9 +403,9 @@ export default function CreateOrderPage() {
 
       setReadStatus(
         [
-          withGemini ? t("Details filled by Gemini.") : t("Details filled."),
+          withGemini ? t("Details filled by Gemini") : t("Details filled"),
           matchMessage,
-          t("Please review before saving."),
+          t("Please review before saving"),
         ]
           .filter(Boolean)
           .join(" ")
@@ -414,7 +414,7 @@ export default function CreateOrderPage() {
       if (extractionIdRef.current !== extractionId) return
 
       setReadStatus(
-        `${t(caught instanceof Error ? caught.message : "Could not read this screenshot.")} ${t("You can fill the fields manually.")}`
+        `${t(caught instanceof Error ? caught.message : "Could not read this screenshot")} ${t("You can fill the fields manually")}`
       )
     }
   }
@@ -431,7 +431,7 @@ export default function CreateOrderPage() {
     }
 
     if (!file.type.startsWith("image/")) {
-      setError(t("Please upload an image."))
+      setError(t("Please upload an image"))
       event.target.value = ""
       return
     }
@@ -442,7 +442,7 @@ export default function CreateOrderPage() {
       setProductPhotoPreview(await readFileAsDataUrl(file))
       setProductPhotoFile(file)
     } catch {
-      setError(t("Could not preview the image. Please choose another image."))
+      setError(t("Could not preview the image. Please choose another image"))
       event.target.value = ""
     }
   }
@@ -490,42 +490,42 @@ export default function CreateOrderPage() {
     const problems: Record<string, string> = {}
 
     if (customerMode === "existing") {
-      if (!selectedCustomer) problems.customerPicker = t("Choose a customer.")
+      if (!selectedCustomer) problems.customerPicker = t("Choose a customer")
     } else if (!customerName.trim()) {
-      problems.customerName = t("Enter the customer's name.")
+      problems.customerName = t("Enter the customer's name")
     }
 
     if (shopMode === "existing") {
       if (!shops.some((shop) => shop.id === selectedShopId)) {
-        problems.shopPicker = t("Choose a shop.")
+        problems.shopPicker = t("Choose a shop")
       }
     } else if (!newShopName.trim()) {
-      problems.newShopName = t("Enter the shop's name.")
+      problems.newShopName = t("Enter the shop's name")
     }
 
-    if (!trimmedProductName) problems.productName = t("Enter the product name.")
-    if (!trimmedSize) problems.productSize = t("Enter the size or variant.")
+    if (!trimmedProductName) problems.productName = t("Enter the product name")
+    if (!trimmedSize) problems.productSize = t("Enter the size or variant")
 
     if (!quantity.trim() || !Number.isInteger(quantityNumber) || quantityNumber < 1) {
-      problems.quantity = t("Quantity must be at least 1.")
+      problems.quantity = t("Quantity must be at least 1")
     }
 
     if (costPriceThb.trim() === "" || !(Number(costPriceThb) >= 0)) {
-      problems.costPriceThb = t("Enter the cost price.")
+      problems.costPriceThb = t("Enter the cost price")
     }
 
     if (secondCurrency && !(Number(exchangeRate) > 0)) {
-      problems.exchangeRate = t("Enter an exchange rate greater than 0.")
+      problems.exchangeRate = t("Enter an exchange rate greater than 0")
     }
 
     if (sellingPriceThb.trim() === "" || !(Number(sellingPriceThb) > 0)) {
-      problems.sellingPriceThb = t("Enter a selling price above 0.")
+      problems.sellingPriceThb = t("Enter a selling price above 0")
     }
 
     setFieldErrors(problems)
 
     if (Object.keys(problems).length > 0) {
-      setError(t("Please fill in the fields marked in red."))
+      setError(t("Please fill in the fields marked in red"))
       focusFirstError(FIELD_ORDER, problems)
       return
     }
@@ -688,7 +688,7 @@ export default function CreateOrderPage() {
       })
     } catch (saveError) {
       await removePhotos(uploadedPaths)
-      setError(messageOf(saveError, t("Could not save the order.")))
+      setError(messageOf(saveError, t("Could not save the order")))
       setSaving(false)
       return
     }
@@ -765,8 +765,8 @@ export default function CreateOrderPage() {
             </CardTitle>
             <CardDescription>
               {useGemini
-                ? t("Optional. Upload the Messenger screenshot. Gemini reads the customer, product and message details and fills the form.")
-                : t("Optional. Upload the Messenger screenshot. The customer and product details are read on this device where possible.")}
+                ? t("Optional. Upload the Messenger screenshot. Gemini reads the customer, product and message details and fills the form")
+                : t("Optional. Upload the Messenger screenshot. The customer and product details are read on this device where possible")}
             </CardDescription>
           </CardHeader>
 
@@ -779,7 +779,7 @@ export default function CreateOrderPage() {
               onChange={handleScreenshotChange}
             />
             <p className="text-xs text-muted-foreground">
-              <RichText text={t("Photos are deleted 7 days after you save the order. Pro accounts can keep them for a month from the order page. To upgrade, contact {email}.")} parts={{ email: <UpgradeLink /> }} />
+              <RichText text={t("Photos are deleted 7 days after you save the order. Pro accounts can keep them for a month from the order page. To upgrade, contact {email}")} parts={{ email: <UpgradeLink /> }} />
             </p>
 
             {screenshotPreview ? (
@@ -812,7 +812,7 @@ export default function CreateOrderPage() {
               <IconUser className="size-5 text-muted-foreground" />{t("Customer")}
               <RequiredMark />
             </CardTitle>
-            <CardDescription>{t("Choose a saved customer or add a new one.")}</CardDescription>
+            <CardDescription>{t("Choose a saved customer or add a new one")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -837,7 +837,7 @@ export default function CreateOrderPage() {
                   onChange={chooseCustomer}
                   placeholder={t("Choose a customer")}
                   searchPlaceholder={t("Search name, phone, Facebook")}
-                  emptyText={t("No saved customers match.")}
+                  emptyText={t("No saved customers match")}
                 />
                 <FieldError id="customerPicker" message={fieldErrors.customerPicker} />
 
@@ -857,7 +857,7 @@ export default function CreateOrderPage() {
                     {!selectedCustomer.facebookName &&
                     !selectedCustomer.phone &&
                     !selectedCustomer.address ? (
-                      <p className="text-muted-foreground">{t("No contact details saved.")}</p>
+                      <p className="text-muted-foreground">{t("No contact details saved")}</p>
                     ) : null}
                   </div>
                 ) : null}
@@ -911,7 +911,7 @@ export default function CreateOrderPage() {
                     className="min-h-20 rounded-xl text-base"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">{t("The customer is saved to your customer list with this order.")}</p>
+                <p className="text-xs text-muted-foreground">{t("The customer is saved to your customer list with this order")}</p>
               </div>
             )}
           </CardContent>
@@ -923,7 +923,7 @@ export default function CreateOrderPage() {
               <IconBuildingStore className="size-5 text-muted-foreground" />{t("Shop")}
               <RequiredMark />
             </CardTitle>
-            <CardDescription>{t("Where this product will be bought.")}</CardDescription>
+            <CardDescription>{t("Where this product will be bought")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -953,7 +953,7 @@ export default function CreateOrderPage() {
                 onChange={chooseShop}
                 placeholder={t("Choose a shop")}
                 searchPlaceholder={t("Search shop or location")}
-                emptyText={t("No saved shops match.")}
+                emptyText={t("No saved shops match")}
               />
               <FieldError id="shopPicker" message={fieldErrors.shopPicker} />
               </div>
@@ -988,7 +988,7 @@ export default function CreateOrderPage() {
                     className="min-h-20 rounded-xl text-base"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">{t("The shop is saved to your shop list with this order.")}</p>
+                <p className="text-xs text-muted-foreground">{t("The shop is saved to your shop list with this order")}</p>
               </div>
             )}
           </CardContent>
@@ -998,7 +998,7 @@ export default function CreateOrderPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <IconMessage2 className="size-5 text-muted-foreground" />{t("Product Info")}</CardTitle>
-            <CardDescription>{t("Record description, size, and color from the customer chat.")}</CardDescription>
+            <CardDescription>{t("Record description, size, and color from the customer chat")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -1146,7 +1146,7 @@ export default function CreateOrderPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <IconTruckDelivery className="size-5 text-muted-foreground" />{t("Status")}</CardTitle>
-            <CardDescription>{t("Track payment and buying or delivery progress.")}</CardDescription>
+            <CardDescription>{t("Track payment and buying or delivery progress")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">

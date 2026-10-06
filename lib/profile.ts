@@ -108,7 +108,7 @@ export async function saveProfile(
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return translate("You are signed out. Log in again.")
+  if (!user) return translate("You are signed out. Log in again")
 
   const { error } = await supabase
     .from("profiles")
@@ -138,7 +138,7 @@ export async function saveCurrencySettings(
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return translate("You are signed out. Log in again.")
+  if (!user) return translate("You are signed out. Log in again")
 
   const pro = canUseSecondCurrency(profile)
 

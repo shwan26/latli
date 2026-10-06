@@ -70,7 +70,7 @@ export default function DashboardPage() {
           }
         }
       } catch (error) {
-        if (!cancelled) setLoadError(messageOf(error, translate("Could not load orders.")))
+        if (!cancelled) setLoadError(messageOf(error, translate("Could not load orders")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -272,7 +272,7 @@ export default function DashboardPage() {
             {summary.notBoughtCount === 0 ? (
               <div className="rounded-2xl bg-muted p-4">
                 <p className="text-sm font-medium">{t("No orders waiting to buy")}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{t("New customer orders with status Not bought will show here.")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("New customer orders with status Not bought will show here")}</p>
               </div>
             ) : (
               <ul className="divide-y rounded-2xl border bg-background">

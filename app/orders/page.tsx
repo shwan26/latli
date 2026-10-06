@@ -142,7 +142,7 @@ function OrdersContent() {
         setOrders(loadedOrders)
         setShopNames([...names.values()].sort((a, b) => a.localeCompare(b)))
       } catch (error) {
-        if (!cancelled) setLoadError(messageOf(error, translate("Could not load orders.")))
+        if (!cancelled) setLoadError(messageOf(error, translate("Could not load orders")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -361,7 +361,7 @@ function OrdersContent() {
 
               <h2 className="mt-4 font-heading text-lg font-medium">{t("No orders found")}</h2>
 
-              <p className="mt-2 text-sm text-muted-foreground">{t("Create your first order or clear filters to see existing orders.")}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{t("Create your first order or clear filters to see existing orders")}</p>
 
               <Button asChild className="mt-5 h-12 w-full rounded-xl">
                 <Link href="/orders/create">

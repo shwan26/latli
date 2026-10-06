@@ -44,12 +44,12 @@ export default function ResetPasswordPage() {
     setError("")
 
     if (password.length < 8) {
-      setError(t("Password must be at least 8 characters."))
+      setError(t("Password must be at least 8 characters"))
       return
     }
 
     if (password !== confirmPassword) {
-      setError(t("Passwords do not match."))
+      setError(t("Passwords do not match"))
       return
     }
 
@@ -88,13 +88,13 @@ export default function ResetPasswordPage() {
         <Card className="w-full rounded-[20px] shadow-none">
           <CardHeader className="px-6 pt-6 pb-0 space-y-1">
             <CardTitle className="text-xl font-medium">{t("Set a new password")}</CardTitle>
-            <CardDescription>{t("Choose a new password for your account.")}</CardDescription>
+            <CardDescription>{t("Choose a new password for your account")}</CardDescription>
           </CardHeader>
           <CardContent className="px-6 pb-6 pt-5">
             {session === "no" ? (
               <div className="space-y-5">
                 <Alert variant="destructive" className="rounded-xl">
-                  <AlertDescription>{t("That reset link is invalid or has expired. Request a new one.")}</AlertDescription>
+                  <AlertDescription>{t("That reset link is invalid or has expired. Request a new one")}</AlertDescription>
                 </Alert>
                 <Button asChild className="w-full h-12 rounded-xl text-base">
                   <Link href="/forgot-password">{t("Send reset link")}</Link>

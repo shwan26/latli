@@ -58,7 +58,7 @@ export default function CustomersPage() {
         setOrders(loadedOrders)
         setCustomers(loadedCustomers)
       } catch (error) {
-        if (!cancelled) setLoadError(messageOf(error, translate("Could not load customers.")))
+        if (!cancelled) setLoadError(messageOf(error, translate("Could not load customers")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -176,7 +176,7 @@ export default function CustomersPage() {
                 <IconUsers className="size-7 text-muted-foreground" />
               </div>
               <h2 className="mt-4 font-heading text-lg font-medium">{t("No customers found")}</h2>
-              <p className="mt-2 text-sm text-muted-foreground">{t("Tap + to add a customer.")}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{t("Tap + to add a customer")}</p>
             </CardContent>
           </Card>
         ) : (

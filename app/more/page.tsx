@@ -174,7 +174,7 @@ export default function MorePage() {
             />
             {profile.plan === "pro" ? null : (
               <p className="text-sm text-muted-foreground">
-                <RichText text={t("To upgrade to Pro, contact {email}.")} parts={{ email: <UpgradeLink account={profile} /> }} />
+                <RichText text={t("To upgrade to Pro, contact {email}")} parts={{ email: <UpgradeLink account={profile} /> }} />
               </p>
             )}
           </CardContent>

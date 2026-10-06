@@ -70,7 +70,7 @@ export function CurrencySettings({ profile, onSaved }: Props) {
     const rate = rateText.trim() === "" ? null : Number(rateText)
 
     if (rate !== null && !(rate > 0)) {
-      setError(t("Enter an exchange rate greater than 0."))
+      setError(t("Enter an exchange rate greater than 0"))
       return
     }
 
@@ -162,9 +162,9 @@ export function CurrencySettings({ profile, onSaved }: Props) {
 
       {pro ? null : (
         <p className="text-xs text-muted-foreground">
-          {t("A second currency with an exchange rate is a Pro feature.")}{" "}
+          {t("A second currency with an exchange rate is a Pro feature")}{" "}
           <RichText
-            text={t("Want Pro? Contact {email}.")}
+            text={t("Want Pro? Contact {email}")}
             parts={{ email: <UpgradeLink account={draft} /> }}
           />
         </p>

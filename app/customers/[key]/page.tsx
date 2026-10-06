@@ -129,7 +129,7 @@ export default function CustomerDetailsPage() {
         setOrders(loadedOrders)
         setSavedCustomers(loadedCustomers)
       } catch (error) {
-        if (!cancelled) setPageError(messageOf(error, translate("Could not load the customer.")))
+        if (!cancelled) setPageError(messageOf(error, translate("Could not load the customer")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -199,7 +199,7 @@ export default function CustomerDetailsPage() {
           customer.id !== existing?.id && getCustomerKey(customer) === nextKey
       )
     ) {
-      setErrorMessage(t("Another customer already uses this phone, Facebook or name."))
+      setErrorMessage(t("Another customer already uses this phone, Facebook or name"))
       return
     }
 
@@ -212,7 +212,7 @@ export default function CustomerDetailsPage() {
         ? await updateCustomer(existing.id, input)
         : await insertCustomer(input)
     } catch (error) {
-      setErrorMessage(messageOf(error, t("Could not save the customer.")))
+      setErrorMessage(messageOf(error, t("Could not save the customer")))
       setSaving(false)
       return
     }
@@ -231,7 +231,7 @@ export default function CustomerDetailsPage() {
       await updateOrdersCustomer(orderIds, input)
     } catch (error) {
       setErrorMessage(
-        `${t("The customer was saved, but their orders were not updated.")} ${messageOf(error, "")}`
+        `${t("The customer was saved, but their orders were not updated")} ${messageOf(error, "")}`
       )
       setSaving(false)
       return
@@ -272,7 +272,7 @@ export default function CustomerDetailsPage() {
     try {
       await deleteCustomer(existing.id)
     } catch (error) {
-      setPageError(messageOf(error, t("Could not delete the customer.")))
+      setPageError(messageOf(error, t("Could not delete the customer")))
       return
     }
 
@@ -300,7 +300,7 @@ export default function CustomerDetailsPage() {
           <Card className="rounded-[20px] shadow-none">
             <CardContent className="p-6 text-center">
               <h1 className="font-heading text-xl font-medium">{t("Customer not found")}</h1>
-              <p className="mt-2 text-sm text-muted-foreground">{t("This customer is not saved and has no orders.")}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{t("This customer is not saved and has no orders")}</p>
             </CardContent>
           </Card>
         </div>
@@ -428,7 +428,7 @@ export default function CustomerDetailsPage() {
 
           {customerOrders.length === 0 ? (
             <Card className="rounded-[20px] shadow-none">
-              <CardContent className="p-5 text-sm text-muted-foreground">{t("No orders yet.")}</CardContent>
+              <CardContent className="p-5 text-sm text-muted-foreground">{t("No orders yet")}</CardContent>
             </Card>
           ) : (
             customerOrders.map((order) => (
@@ -445,8 +445,8 @@ export default function CustomerDetailsPage() {
             <SheetTitle className="font-heading text-xl">{t("Edit Customer")}</SheetTitle>
             <SheetDescription>
               {summary.saved
-                ? t("Saving also updates the details on this customer's orders.")
-                : t("Saving adds this customer to your saved customers and updates the details on their orders.")}
+                ? t("Saving also updates the details on this customer's orders")
+                : t("Saving adds this customer to your saved customers and updates the details on their orders")}
             </SheetDescription>
           </SheetHeader>
 
@@ -470,8 +470,8 @@ export default function CustomerDetailsPage() {
             <DialogTitle>{t("Delete {name}?", { name: summary.name })}</DialogTitle>
             <DialogDescription>
               {customerOrders.length > 0
-                ? t(customerOrders.length === 1 ? "This removes the saved customer. Their {count} order stays and the customer still shows in the list because of it." : "This removes the saved customer. Their {count} orders stay and the customer still shows in the list because of them.", { count: customerOrders.length })
-                : t("This removes the saved customer.")}
+                ? t(customerOrders.length === 1 ? "This removes the saved customer. Their {count} order stays and the customer still shows in the list because of it" : "This removes the saved customer. Their {count} orders stay and the customer still shows in the list because of them", { count: customerOrders.length })
+                : t("This removes the saved customer")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

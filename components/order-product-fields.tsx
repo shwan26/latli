@@ -64,7 +64,7 @@ export function OrderProductFields({
 
       {!canPickSaved ? (
         <p className="text-xs text-muted-foreground">
-          {t("This shop has no saved products yet. A new product is saved to the shop with this order.")}
+          {t("This shop has no saved products yet. A new product is saved to the shop with this order")}
         </p>
       ) : null}
 
@@ -84,7 +84,7 @@ export function OrderProductFields({
           }}
           placeholder={t("Choose a product")}
           searchPlaceholder={t("Search products")}
-          emptyText={t("No saved products match.")}
+          emptyText={t("No saved products match")}
         />
       ) : null}
 

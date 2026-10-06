@@ -43,7 +43,7 @@ export default function AddCustomerPage() {
     }
 
     if (!input.name) {
-      setErrorMessage(t("Enter the customer's name."))
+      setErrorMessage(t("Enter the customer's name"))
       return
     }
 
@@ -54,7 +54,7 @@ export default function AddCustomerPage() {
       const saved = await listCustomers()
 
       if (saved.some((existing) => getCustomerKey(existing) === key)) {
-        setErrorMessage(t("A customer with this phone, Facebook or name is already saved."))
+        setErrorMessage(t("A customer with this phone, Facebook or name is already saved"))
         setSaving(false)
         return
       }
@@ -62,7 +62,7 @@ export default function AddCustomerPage() {
       await insertCustomer(input)
       router.push("/customers")
     } catch (error) {
-      setErrorMessage(messageOf(error, t("Could not save the customer.")))
+      setErrorMessage(messageOf(error, t("Could not save the customer")))
       setSaving(false)
     }
   }
@@ -89,7 +89,7 @@ export default function AddCustomerPage() {
           <RequiredMark /> {t("required")}
         </p>
         <p className="text-sm text-muted-foreground">
-          {t("Orders with the same phone, Facebook or name are linked to this customer.")}
+          {t("Orders with the same phone, Facebook or name are linked to this customer")}
         </p>
 
         <CustomerForm

@@ -19,7 +19,7 @@ const ibmPlexSans = IBM_Plex_Sans({subsets:['latin'],variable:'--font-sans'});
 // Burmese text needs a font with Myanmar letters. Used when the page is in MM.
 const notoMyanmar = Noto_Sans_Myanmar({
   subsets: ["myanmar"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-myanmar",
 });
 
@@ -40,7 +40,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t("Latli | Retailer Process Management"),
     description: t(
-      "Manage retailer orders, payments, customer history, and delivery handoff in one focused workspace."
+      "Manage retailer orders, payments, customer history, and delivery handoff in one focused workspace"
     ),
   };
 }

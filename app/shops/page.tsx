@@ -143,7 +143,7 @@ export default function ShopsPage() {
         setIsPro(profile?.plan === "pro")
         setAccount(profile)
       } catch (error) {
-        if (!cancelled) setErrorMessage(messageOf(error, translate("Could not load shops.")))
+        if (!cancelled) setErrorMessage(messageOf(error, translate("Could not load shops")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -191,7 +191,7 @@ export default function ShopsPage() {
       return true
     } catch (error) {
       setSavedMessage("")
-      setErrorMessage(messageOf(error, t("Could not save.")))
+      setErrorMessage(messageOf(error, t("Could not save")))
       return false
     } finally {
       setBusy(false)
@@ -238,7 +238,7 @@ export default function ShopsPage() {
           shop.id === selectedShop.id ? { ...shop, ...input } : shop
         )
       )
-    }, t("Shop updated."))
+    }, t("Shop updated"))
 
     if (saved) setEditing(false)
   }
@@ -250,7 +250,7 @@ export default function ShopsPage() {
       await deleteShop(selectedShop)
 
       setShops((current) => current.filter((shop) => shop.id !== selectedShop.id))
-    }, t("Shop deleted."))
+    }, t("Shop deleted"))
 
     if (saved) closeShop()
   }
@@ -296,7 +296,7 @@ export default function ShopsPage() {
             : shop
         )
       )
-    }, t("Product added."))
+    }, t("Product added"))
 
     if (saved) setProductDraft(emptyProductDraft)
   }
@@ -318,7 +318,7 @@ export default function ShopsPage() {
 
         return next
       })
-    }, t("Photos will be kept for a month."))
+    }, t("Photos will be kept for a month"))
   }
 
   async function handleRemoveProduct(product: LocalShopProduct) {
@@ -337,7 +337,7 @@ export default function ShopsPage() {
             : shop
         )
       )
-    }, t("Product removed."))
+    }, t("Product removed"))
   }
 
   if (!mounted) {
@@ -413,11 +413,11 @@ export default function ShopsPage() {
 
           {shops.length === 0 ? (
             <Card className="rounded-[20px] shadow-none">
-              <CardContent className="p-5 text-sm text-muted-foreground">{t("No shops saved yet.")}</CardContent>
+              <CardContent className="p-5 text-sm text-muted-foreground">{t("No shops saved yet")}</CardContent>
             </Card>
           ) : visibleShops.length === 0 ? (
             <Card className="rounded-[20px] shadow-none">
-              <CardContent className="p-5 text-sm text-muted-foreground">{t("No shops match your search.")}</CardContent>
+              <CardContent className="p-5 text-sm text-muted-foreground">{t("No shops match your search")}</CardContent>
             </Card>
           ) : (
             <Card className="overflow-hidden rounded-[20px] shadow-none">
@@ -497,8 +497,8 @@ export default function ShopsPage() {
             <DialogDescription>
               {t(
                 selectedShop?.products.length === 1
-                  ? "This removes the shop and its {count} product. Existing orders keep the shop name."
-                  : "This removes the shop and its {count} products. Existing orders keep the shop name.",
+                  ? "This removes the shop and its {count} product. Existing orders keep the shop name"
+                  : "This removes the shop and its {count} products. Existing orders keep the shop name",
                 { count: selectedShop?.products.length ?? 0 }
               )}
             </DialogDescription>
@@ -694,10 +694,10 @@ function ShopDetail({
           <div className="space-y-2 rounded-2xl border p-3">
             <p className="text-sm text-muted-foreground">
               {isPro ? (
-                t("Product photos are deleted 7 days after they are saved.")
+                t("Product photos are deleted 7 days after they are saved")
               ) : (
                 <RichText
-                  text={t("Product photos are deleted 7 days after they are saved. Pro accounts can keep them for a month. To upgrade, contact {email}.")}
+                  text={t("Product photos are deleted 7 days after they are saved. Pro accounts can keep them for a month. To upgrade, contact {email}")}
                   parts={{ email: <UpgradeLink account={account ?? undefined} /> }}
                 />
               )}
@@ -869,7 +869,7 @@ function ProductImageInput({
     try {
       onChange(await resizeImageToDataUrl(file))
     } catch {
-      setError(t("Could not read this image. Try a JPG or PNG photo."))
+      setError(t("Could not read this image. Try a JPG or PNG photo"))
     }
   }
 
@@ -911,7 +911,7 @@ function ProductImageInput({
         className="h-12 rounded-xl text-base"
       />
 
-      <p className="text-xs text-muted-foreground">{t("Photos are deleted 7 days after they are saved.")}</p>
+      <p className="text-xs text-muted-foreground">{t("Photos are deleted 7 days after they are saved")}</p>
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>

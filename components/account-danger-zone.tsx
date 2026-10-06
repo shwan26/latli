@@ -60,14 +60,14 @@ export function AccountDangerZone() {
         } | null
 
         throw new Error(
-          t(body?.error ?? "Something went wrong. Please try again.")
+          t(body?.error ?? "Something went wrong. Please try again")
         )
       }
     } catch (runError) {
       setError(
         runError instanceof Error
           ? runError.message
-          : t("Something went wrong. Please try again.")
+          : t("Something went wrong. Please try again")
       )
       setBusy(false)
       return
@@ -80,7 +80,7 @@ export function AccountDangerZone() {
       await createClient().auth.signOut()
       router.push("/login")
     } else {
-      setNotice(t("All your data was cleared."))
+      setNotice(t("All your data was cleared"))
     }
 
     router.refresh()
@@ -124,20 +124,20 @@ export function AccountDangerZone() {
             </DialogTitle>
             <DialogDescription>
               {deleting
-                ? t("This permanently deletes your account, orders, customers, shops, cargo companies and photos. It cannot be undone.")
-                : t("This permanently deletes all your orders, customers, shops, cargo companies and photos. Your account and settings stay. It cannot be undone.")}
+                ? t("This permanently deletes your account, orders, customers, shops, cargo companies and photos. It cannot be undone")
+                : t("This permanently deletes all your orders, customers, shops, cargo companies and photos. Your account and settings stay. It cannot be undone")}
             </DialogDescription>
           </DialogHeader>
 
           {deleting ? (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                {t("Type {word} to confirm.", { word: CONFIRM_WORD })}
+                {t("Type {word} to confirm", { word: CONFIRM_WORD })}
               </p>
               <Input
                 value={typed}
                 onChange={(event) => setTyped(event.target.value)}
-                aria-label={t("Type {word} to confirm.", { word: CONFIRM_WORD })}
+                aria-label={t("Type {word} to confirm", { word: CONFIRM_WORD })}
                 autoComplete="off"
                 className="h-12 rounded-xl"
               />
