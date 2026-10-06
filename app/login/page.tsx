@@ -33,9 +33,9 @@ export default function LoginPage() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError("")
-    if (!email || !password) { setError(t("Please enter your email and password.")); return }
+    if (!email || !password) { setError(t("Please enter your email and password")); return }
     if (!isSupabaseConfigured) {
-      setError(t("Supabase is not set up. See supabase/README.md."))
+      setError(t("Supabase is not set up. See supabase/README.md"))
       return
     }
 
@@ -80,7 +80,7 @@ export default function LoginPage() {
         <Card className="w-full rounded-[20px] shadow-none">
           <CardHeader className="px-6 pt-6 pb-0 space-y-1">
             <CardTitle className="text-xl font-medium">{t("Welcome back")}</CardTitle>
-            <CardDescription>{t("Enter your account details to continue.")}</CardDescription>
+            <CardDescription>{t("Enter your account details to continue")}</CardDescription>
           </CardHeader>
           <CardContent className="px-6 pb-6 pt-5">
             <form onSubmit={handleLogin} className="space-y-5">

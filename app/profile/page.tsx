@@ -68,7 +68,7 @@ export default function ProfilePage() {
       if (cancelled) return
 
       if (loaded) setProfile(loaded)
-      else setError(translate("Could not load your profile."))
+      else setError(translate("Could not load your profile"))
       setMounted(true)
     }
 
@@ -92,7 +92,7 @@ export default function ProfilePage() {
     setError("")
 
     if (profile.age !== null && (profile.age < 13 || profile.age > 120)) {
-      setError(t("Enter a valid age between 13 and 120."))
+      setError(t("Enter a valid age between 13 and 120"))
       return
     }
 
@@ -178,7 +178,7 @@ export default function ProfilePage() {
 
               {saved ? (
                 <Alert className="rounded-xl">
-                  <AlertDescription>{t("Profile settings saved.")}</AlertDescription>
+                  <AlertDescription>{t("Profile settings saved")}</AlertDescription>
                 </Alert>
               ) : null}
 
@@ -271,12 +271,12 @@ export default function ProfilePage() {
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                {t("Managers on the Pro plan read order screenshots with Gemini. Everyone else reads them on this device. Plan and role are set by an admin.")}
+                {t("Managers on the Pro plan read order screenshots with Gemini. Everyone else reads them on this device. Plan and role are set by an admin")}
                 {profile.plan === "pro" ? null : (
                   <>
                     {" "}
                     <RichText
-                      text={t("Want Pro? Contact {email}.")}
+                      text={t("Want Pro? Contact {email}")}
                       parts={{ email: <UpgradeLink account={profile} /> }}
                     />
                   </>

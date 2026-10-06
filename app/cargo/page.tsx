@@ -39,7 +39,7 @@ export default function CargoPage() {
 
         if (!cancelled) setCompanies(loaded)
       } catch (loadError) {
-        if (!cancelled) setError(messageOf(loadError, translate("Could not load cargo.")))
+        if (!cancelled) setError(messageOf(loadError, translate("Could not load cargo")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -69,7 +69,7 @@ export default function CargoPage() {
       setDraft(emptyCargoDraft)
       setSaved(true)
     } catch (saveError) {
-      setError(messageOf(saveError, t("Could not save the cargo company.")))
+      setError(messageOf(saveError, t("Could not save the cargo company")))
     } finally {
       setSaving(false)
     }
@@ -110,7 +110,7 @@ export default function CargoPage() {
 
         {saved ? (
           <Alert className="rounded-xl">
-            <AlertDescription>{t("Cargo company saved.")}</AlertDescription>
+            <AlertDescription>{t("Cargo company saved")}</AlertDescription>
           </Alert>
         ) : null}
 
@@ -174,7 +174,7 @@ export default function CargoPage() {
 
           {companies.length === 0 ? (
             <Card className="rounded-[20px] shadow-none">
-              <CardContent className="p-5 text-sm text-muted-foreground">{t("No cargo companies saved yet.")}</CardContent>
+              <CardContent className="p-5 text-sm text-muted-foreground">{t("No cargo companies saved yet")}</CardContent>
             </Card>
           ) : (
             companies.map((company) => (

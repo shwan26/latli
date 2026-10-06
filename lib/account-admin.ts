@@ -59,7 +59,7 @@ export async function removeAllPhotos(db: AdminClient, userId: string) {
 }
 
 export const NOT_SIGNED_IN = Response.json(
-  { error: "You are signed out. Log in again." },
+  { error: "You are signed out. Log in again" },
   { status: 401 }
 )
 

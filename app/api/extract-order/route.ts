@@ -79,7 +79,7 @@ function fail(message: string, status: number) {
 
 export async function POST(request: Request) {
   if (!isSupabaseConfigured) {
-    return fail("Supabase is not set up. See supabase/README.md.", 503)
+    return fail("Supabase is not set up. See supabase/README.md", 503)
   }
 
   const supabase = await createClient()
@@ -87,19 +87,19 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return fail("Log in to read screenshots with Gemini.", 401)
+  if (!user) return fail("Log in to read screenshots with Gemini", 401)
 
   const profile = await fetchProfile(supabase)
 
   if (!profile || !canUseGemini(profile)) {
-    return fail("Gemini is available to managers on the Pro plan.", 403)
+    return fail("Gemini is available to managers on the Pro plan", 403)
   }
 
   const apiKey = process.env.GEMINI_API_KEY
 
   if (!apiKey) {
     return fail(
-      "Gemini is not set up. Add GEMINI_API_KEY to .env.local and restart the server.",
+      "Gemini is not set up. Add GEMINI_API_KEY to .env.local and restart the server",
       503
     )
   }
@@ -110,13 +110,13 @@ export async function POST(request: Request) {
     const body = await request.json()
     image = typeof body?.image === "string" ? body.image : ""
   } catch {
-    return fail("The request was not valid.", 400)
+    return fail("The request was not valid", 400)
   }
 
   const match = image.match(/^data:(image\/(?:jpeg|png|webp));base64,([\w+/=]+)$/)
 
   if (!match || image.length > MAX_IMAGE_CHARS) {
-    return fail("Upload a JPG, PNG or WebP image under about 6 MB.", 400)
+    return fail("Upload a JPG, PNG or WebP image under about 6 MB", 400)
   }
 
   let response: Response
@@ -149,7 +149,7 @@ export async function POST(request: Request) {
       }
     )
   } catch {
-    return fail("Gemini did not answer in time. Try again.", 504)
+    return fail("Gemini did not answer in time. Try again", 504)
   }
 
   if (!response.ok) {
@@ -157,8 +157,8 @@ export async function POST(request: Request) {
 
     return fail(
       response.status === 429
-        ? "Gemini is busy or over its limit. Try again in a minute."
-        : "Gemini could not read this image.",
+        ? "Gemini is busy or over its limit. Try again in a minute"
+        : "Gemini could not read this image",
       502
     )
   }
@@ -182,6 +182,6 @@ export async function POST(request: Request) {
 
     return Response.json({ data })
   } catch {
-    return fail("Gemini returned an answer that could not be read.", 502)
+    return fail("Gemini returned an answer that could not be read", 502)
   }
 }

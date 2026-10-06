@@ -31,7 +31,7 @@ export async function POST() {
     }
   } catch (error) {
     console.error("clear account data failed", error)
-    return Response.json({ error: "Could not clear your data." }, { status: 500 })
+    return Response.json({ error: "Could not clear your data" }, { status: 500 })
   }
 
   return Response.json({ ok: true })

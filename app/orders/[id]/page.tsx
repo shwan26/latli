@@ -226,7 +226,7 @@ export default function OrderDetailsPage() {
           setPhotoExpiresAt(Object.values(expiry).sort()[0] ?? "")
         }
       } catch (loadError) {
-        if (!cancelled) setError(messageOf(loadError, translate("Could not load the order.")))
+        if (!cancelled) setError(messageOf(loadError, translate("Could not load the order")))
       } finally {
         if (!cancelled) setMounted(true)
       }
@@ -265,7 +265,7 @@ export default function OrderDetailsPage() {
     }
 
     if (!file.type.startsWith("image/")) {
-      setError(t("Please upload an image."))
+      setError(t("Please upload an image"))
       event.target.value = ""
       return
     }
@@ -274,7 +274,7 @@ export default function OrderDetailsPage() {
       setNewPhotoDataUrl(await resizeImageToDataUrl(file, 1600, 0.8))
       setNewPhotoName(file.name)
     } catch {
-      setError(t("Could not preview the image. Please choose another image."))
+      setError(t("Could not preview the image. Please choose another image"))
       event.target.value = ""
     }
   }
@@ -292,7 +292,7 @@ export default function OrderDetailsPage() {
     }
 
     if (!file.type.startsWith("image/")) {
-      setError(t("Please upload an image."))
+      setError(t("Please upload an image"))
       event.target.value = ""
       return
     }
@@ -300,7 +300,7 @@ export default function OrderDetailsPage() {
     try {
       setNewScreenshotDataUrl(await resizeImageToDataUrl(file, 1600, 0.8))
     } catch {
-      setError(t("Could not preview the image. Please choose another image."))
+      setError(t("Could not preview the image. Please choose another image"))
       event.target.value = ""
     }
   }
@@ -341,7 +341,7 @@ export default function OrderDetailsPage() {
         await keepPhotosLonger([order.productPhotoPath, order.orderScreenshotPath])
       )
     } catch (keepError) {
-      setError(messageOf(keepError, t("Could not keep the photos longer.")))
+      setError(messageOf(keepError, t("Could not keep the photos longer")))
     } finally {
       setKeeping(false)
     }
@@ -355,7 +355,7 @@ export default function OrderDetailsPage() {
     try {
       await deleteOrder(order)
     } catch (deleteError) {
-      setError(messageOf(deleteError, t("Could not delete the order.")))
+      setError(messageOf(deleteError, t("Could not delete the order")))
       return
     }
 
@@ -367,7 +367,7 @@ export default function OrderDetailsPage() {
     setError("")
 
     if (!order) {
-      setError(t("Order could not be found."))
+      setError(t("Order could not be found"))
       return
     }
 
@@ -377,26 +377,26 @@ export default function OrderDetailsPage() {
     // Check every required field at once, so all problems show together.
     const problems: Record<string, string> = {}
 
-    if (!customerName.trim()) problems.customerName = t("Enter the customer's name.")
-    if (!productName.trim()) problems.productName = t("Enter the product name.")
-    if (!trimmedSize) problems.productSize = t("Enter the size or variant.")
+    if (!customerName.trim()) problems.customerName = t("Enter the customer's name")
+    if (!productName.trim()) problems.productName = t("Enter the product name")
+    if (!trimmedSize) problems.productSize = t("Enter the size or variant")
 
     if (!quantity.trim() || !Number.isInteger(quantityNumber) || quantityNumber < 1) {
-      problems.quantity = t("Quantity must be at least 1.")
+      problems.quantity = t("Quantity must be at least 1")
     }
 
     if (costPriceThb.trim() === "" || !(Number(costPriceThb) >= 0)) {
-      problems.costPriceThb = t("Enter the cost price.")
+      problems.costPriceThb = t("Enter the cost price")
     }
 
     if (sellingPriceThb.trim() === "" || !(Number(sellingPriceThb) > 0)) {
-      problems.sellingPriceThb = t("Enter a selling price above 0.")
+      problems.sellingPriceThb = t("Enter a selling price above 0")
     }
 
     setFieldErrors(problems)
 
     if (Object.keys(problems).length > 0) {
-      setError(t("Please fill in the fields marked in red."))
+      setError(t("Please fill in the fields marked in red"))
       focusFirstError(FIELD_ORDER, problems)
       return
     }
@@ -547,7 +547,7 @@ export default function OrderDetailsPage() {
       router.push("/orders")
     } catch (saveError) {
       await removePhotos(uploadedPaths)
-      setError(messageOf(saveError, t("Could not save the order. Please try again.")))
+      setError(messageOf(saveError, t("Could not save the order. Please try again")))
     } finally {
       setSaving(false)
     }
@@ -574,7 +574,7 @@ export default function OrderDetailsPage() {
           <Card className="rounded-[20px] shadow-none">
             <CardContent className="p-6 text-center">
               <h1 className="font-heading text-xl font-medium">{t("Order not found")}</h1>
-              <p className="mt-2 text-sm text-muted-foreground">{t("This order may have been deleted.")}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{t("This order may have been deleted")}</p>
             </CardContent>
           </Card>
         </div>
@@ -624,7 +624,7 @@ export default function OrderDetailsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <IconCamera className="size-5 text-muted-foreground" />{t("Chat Screenshot")}</CardTitle>
-            <CardDescription>{t("View or replace the customer chat screenshot.")}</CardDescription>
+            <CardDescription>{t("View or replace the customer chat screenshot")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -661,14 +661,14 @@ export default function OrderDetailsPage() {
               <div className="space-y-2 rounded-xl border bg-background p-3">
                 <p className="text-sm">
                   {photoExpiresAt
-                    ? t("Photos are deleted on {date}.", {
+                    ? t("Photos are deleted on {date}", {
                         date: new Date(photoExpiresAt).toLocaleDateString(dateLocale(), {
                           year: "numeric",
                           month: "short",
                           day: "numeric",
                         }),
                       })
-                    : t("Photos are deleted 7 days after they are saved.")}
+                    : t("Photos are deleted 7 days after they are saved")}
                 </p>
                 {isPro ? (
                   <Button
@@ -682,7 +682,7 @@ export default function OrderDetailsPage() {
                   </Button>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    <RichText text={t("Pro accounts can keep photos for a month. To upgrade, contact {email}.")} parts={{ email: <UpgradeLink account={account ?? undefined} /> }} />
+                    <RichText text={t("Pro accounts can keep photos for a month. To upgrade, contact {email}")} parts={{ email: <UpgradeLink account={account ?? undefined} /> }} />
                   </p>
                 )}
               </div>
@@ -740,7 +740,7 @@ export default function OrderDetailsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <IconBuildingStore className="size-5 text-muted-foreground" />{t("Shop")}</CardTitle>
-            <CardDescription>{t("Where this product will be bought.")}</CardDescription>
+            <CardDescription>{t("Where this product will be bought")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -780,7 +780,7 @@ export default function OrderDetailsPage() {
                 onChange={chooseShop}
                 placeholder={t("Choose a shop")}
                 searchPlaceholder={t("Search shop or location")}
-                emptyText={t("No saved shops match.")}
+                emptyText={t("No saved shops match")}
               />
             ) : (
               <div className="space-y-4">
@@ -805,7 +805,7 @@ export default function OrderDetailsPage() {
                   onChange={setNewShopLocation}
                   placeholder={t("Shop address, mall, or market")}
                 />
-                <p className="text-xs text-muted-foreground">{t("The shop is saved to your shop list with this order.")}</p>
+                <p className="text-xs text-muted-foreground">{t("The shop is saved to your shop list with this order")}</p>
               </div>
             )}
           </CardContent>
@@ -953,7 +953,7 @@ export default function OrderDetailsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <IconTruck className="size-5 text-muted-foreground" />{t("Cargo")}</CardTitle>
-            <CardDescription>{t("Optional. The cargo company that carries this order.")}</CardDescription>
+            <CardDescription>{t("Optional. The cargo company that carries this order")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-3">
@@ -981,7 +981,7 @@ export default function OrderDetailsPage() {
                 }}
                 placeholder={t("Choose a cargo company")}
                 searchPlaceholder={t("Search cargo")}
-                emptyText={t("No saved cargo match.")}
+                emptyText={t("No saved cargo match")}
               />
             )}
 
@@ -1015,7 +1015,7 @@ export default function OrderDetailsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <IconTruckDelivery className="size-5 text-muted-foreground" />{t("Status")}</CardTitle>
-            <CardDescription>{t("Update payment and order progress.")}</CardDescription>
+            <CardDescription>{t("Update payment and order progress")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -1069,7 +1069,7 @@ export default function OrderDetailsPage() {
           <DialogHeader>
             <DialogTitle>{t("Delete {name}?", { name: order.orderNumber })}</DialogTitle>
             <DialogDescription>
-              {t("This permanently removes the order and its photos.")}
+              {t("This permanently removes the order and its photos")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

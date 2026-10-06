@@ -39,12 +39,12 @@ function ForgotPasswordForm() {
     setError("")
 
     if (!email.trim()) {
-      setError(t("Please enter your email address."))
+      setError(t("Please enter your email address"))
       return
     }
 
     if (!isSupabaseConfigured) {
-      setError(t("Supabase is not set up. See supabase/README.md."))
+      setError(t("Supabase is not set up. See supabase/README.md"))
       return
     }
 
@@ -89,13 +89,13 @@ function ForgotPasswordForm() {
         <Card className="w-full rounded-[20px] shadow-none">
           <CardHeader className="px-6 pt-6 pb-0 space-y-1">
             <CardTitle className="text-xl font-medium">{t("Forgot password?")}</CardTitle>
-            <CardDescription>{t("Enter your email and we will send you a link to reset your password.")}</CardDescription>
+            <CardDescription>{t("Enter your email and we will send you a link to reset your password")}</CardDescription>
           </CardHeader>
           <CardContent className="px-6 pb-6 pt-5">
             {sent ? (
               <div className="space-y-5">
                 <Alert className="rounded-xl">
-                  <AlertDescription>{t("If an account exists for that email, we sent a reset link. Check your inbox.")}</AlertDescription>
+                  <AlertDescription>{t("If an account exists for that email, we sent a reset link. Check your inbox")}</AlertDescription>
                 </Alert>
                 <Button asChild variant="outline" className="w-full h-12 rounded-xl text-base">
                   <Link href="/login">{t("Back to login")}</Link>
@@ -105,7 +105,7 @@ function ForgotPasswordForm() {
               <form onSubmit={handleSubmit} className="space-y-5">
                 {expired ? (
                   <Alert className="rounded-xl">
-                    <AlertDescription>{t("That reset link is invalid or has expired. Request a new one.")}</AlertDescription>
+                    <AlertDescription>{t("That reset link is invalid or has expired. Request a new one")}</AlertDescription>
                   </Alert>
                 ) : null}
 

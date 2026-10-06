@@ -27,7 +27,11 @@ export function translateTo(
   text: string,
   vars?: Record<string, string | number>
 ) {
-  return fill(lang === "my" ? (my[text] ?? text) : text, vars)
+  // Texts have no closing period, but messages from the database and Supabase
+  // Auth still do, so a trailing "." is ignored when looking one up.
+  const key = /[^.]\.$/.test(text) ? text.slice(0, -1) : text
+
+  return fill(lang === "my" ? (my[text] ?? my[key] ?? text) : text, vars)
 }
 
 // The language of the page that is open in this browser. Components should use

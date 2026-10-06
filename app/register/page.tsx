@@ -70,34 +70,34 @@ export default function CreateAccountPage() {
       !password ||
       !confirmPassword
     ) {
-      setError(t("Please fill in all required fields."))
+      setError(t("Please fill in all required fields"))
       return
     }
 
     const ageNumber = Number(age)
 
     if (!Number.isInteger(ageNumber) || ageNumber < 13 || ageNumber > 120) {
-      setError(t("Enter a valid age between 13 and 120."))
+      setError(t("Enter a valid age between 13 and 120"))
       return
     }
 
     if (password.length < 8) {
-      setError(t("Password must be at least 8 characters."))
+      setError(t("Password must be at least 8 characters"))
       return
     }
 
     if (password !== confirmPassword) {
-      setError(t("Passwords do not match."))
+      setError(t("Passwords do not match"))
       return
     }
 
     if (!agreed) {
-      setError(t("Please agree to the Terms of Service and Privacy Policy."))
+      setError(t("Please agree to the Terms of Service and Privacy Policy"))
       return
     }
 
     if (!isSupabaseConfigured) {
-      setError(t("Supabase is not set up. See supabase/README.md."))
+      setError(t("Supabase is not set up. See supabase/README.md"))
       return
     }
 
@@ -156,13 +156,13 @@ export default function CreateAccountPage() {
 
           <h1 className="sr-only">{t("Latli")}</h1>
 
-          <p className="mt-1.5 text-sm text-muted-foreground">{t("Set up your shop to manage orders and deliveries.")}</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">{t("Set up your shop to manage orders and deliveries")}</p>
         </div>
 
         <Card className="w-full rounded-[20px] shadow-none">
           <CardHeader className="px-6 pt-6 pb-0 space-y-1">
             <CardTitle className="text-xl font-medium">{t("Register your shop")}</CardTitle>
-            <CardDescription>{t("Enter your details to create an owner account.")}</CardDescription>
+            <CardDescription>{t("Enter your details to create an owner account")}</CardDescription>
           </CardHeader>
 
           <CardContent className="px-6 pb-6 pt-5">
@@ -170,7 +170,7 @@ export default function CreateAccountPage() {
               <div className="space-y-5">
                 <Alert className="rounded-xl">
                   <AlertDescription>
-                    {t("We sent a confirmation link to {email}. Open it to activate your account, then log in.", { email: email.trim() })}
+                    {t("We sent a confirmation link to {email}. Open it to activate your account, then log in", { email: email.trim() })}
                   </AlertDescription>
                 </Alert>
                 <Button asChild className="w-full h-12 rounded-xl text-base">
@@ -300,7 +300,7 @@ export default function CreateAccountPage() {
                   </button>
                 </div>
 
-                <p className="text-xs text-muted-foreground">{t("Use at least 8 characters.")}</p>
+                <p className="text-xs text-muted-foreground">{t("Use at least 8 characters")}</p>
               </div>
 
               <div className="space-y-2">
@@ -350,7 +350,7 @@ export default function CreateAccountPage() {
                   className="text-sm font-normal leading-snug text-muted-foreground"
                 >
                   <RichText
-                    text={t("I agree to the {terms} and {privacy}.")}
+                    text={t("I agree to the {terms} and {privacy}")}
                     parts={{
                       terms: (
                         <Link href="/terms" className="font-medium text-foreground underline" target="_blank">

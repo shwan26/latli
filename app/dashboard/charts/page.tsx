@@ -40,7 +40,7 @@ export default function ProChartsPage() {
           setCurrency(profile.baseCurrency)
         }
       } catch (loadError) {
-        if (!cancelled) setError(messageOf(loadError, translate("Could not load charts.")))
+        if (!cancelled) setError(messageOf(loadError, translate("Could not load charts")))
       } finally {
         if (!cancelled) setReady(true)
       }
@@ -86,7 +86,7 @@ export default function ProChartsPage() {
         ) : null}
         {!isPro ? (
           <Alert className="rounded-xl">
-            <AlertDescription>{t("More charts are available on the Pro plan.")}</AlertDescription>
+            <AlertDescription>{t("More charts are available on the Pro plan")}</AlertDescription>
           </Alert>
         ) : (
           <ProCharts orders={orders} currency={currency} />

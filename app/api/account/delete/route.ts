@@ -27,7 +27,7 @@ export async function POST() {
     if (error) throw new Error(error.message)
   } catch (error) {
     console.error("delete account failed", error)
-    return Response.json({ error: "Could not delete your account." }, { status: 500 })
+    return Response.json({ error: "Could not delete your account" }, { status: 500 })
   }
 
   return Response.json({ ok: true })
