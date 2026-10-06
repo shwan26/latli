@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
 import {
   CartesianGrid,
   Line,
@@ -136,26 +137,28 @@ export function MonthlySalesChart({ orders, currency }: Props) {
     <Card className="rounded-[20px] shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-medium">{t("Monthly sales")}</CardTitle>
-        <div className="flex items-center justify-between gap-2 pt-1">
+        <div className="flex items-center justify-between gap-3 pt-1">
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="rounded-xl"
+            size="icon"
+            className="size-10 shrink-0 rounded-full"
             onClick={() => shift(-1)}
+            aria-label={t("Previous month")}
           >
-            {t("Previous month")}
+            <IconChevronLeft className="size-5" />
           </Button>
-          <span className="text-sm font-medium">{label}</span>
+          <span className="min-w-0 flex-1 text-center text-sm font-medium">{label}</span>
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="rounded-xl"
+            size="icon"
+            className="size-10 shrink-0 rounded-full"
             disabled={isCurrentMonth}
             onClick={() => shift(1)}
+            aria-label={t("Next month")}
           >
-            {t("Next month")}
+            <IconChevronRight className="size-5" />
           </Button>
         </div>
       </CardHeader>
