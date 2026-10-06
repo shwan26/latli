@@ -4,6 +4,9 @@ import { check, getDb } from "./shared"
 
 const BUCKET = "photos"
 
+// Matches the bucket's file_size_limit.
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024
+
 export type PhotoFolder = "orders" | "products"
 
 // Uploads a JPEG/PNG/WebP data URL to <user id>/<folder>/<random>.<ext>
@@ -17,6 +20,27 @@ export async function uploadPhoto(dataUrl: string, folder: PhotoFolder) {
   if (!user) throw new Error(translate("You are signed out. Log in again"))
 
   const blob = await (await fetch(dataUrl)).blob()
+
+  if (blob.size > MAX_PHOTO_BYTES) {
+    throw new Error(translate("Photos can be at most 5 MB"))
+  }
+
+  // The database enforces this too; checking here gives a clear message.
+  const { data: quota } = await db.rpc("photo_quota").maybeSingle<{
+    used: number
+    max: number
+  }>()
+
+  if (quota && quota.used >= quota.max) {
+    throw new Error(
+      translate(
+        quota.max > 30
+          ? "Photo limit reached ({max} photos). Delete old photos to upload more"
+          : "Photo limit reached ({max} photos). Delete old photos or upgrade to Pro to upload more",
+        { max: quota.max }
+      )
+    )
+  }
   const extension =
     blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg"
   const path = `${user.id}/${folder}/${crypto.randomUUID()}.${extension}`

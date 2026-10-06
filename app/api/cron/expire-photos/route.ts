@@ -1,4 +1,5 @@
-// Deletes photos whose retention date has passed. Run it on a schedule (see
+// Deletes photos whose retention date has passed, and photos that were
+// uploaded but never saved on an order or product. Run it on a schedule (see
 // supabase/README.md). It needs the service role key, so it must stay on the
 // server, and the caller must send "Authorization: Bearer <CRON_SECRET>".
 
@@ -42,6 +43,7 @@ async function expirePhotos(request: Request) {
   })
 
   let deleted = 0
+  let orphans = 0
 
   for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
     const { data, error } = await db.rpc("expired_photo_paths", {
@@ -79,7 +81,35 @@ async function expirePhotos(request: Request) {
     if (paths.length < BATCH) break
   }
 
-  return Response.json({ deleted })
+  // Files that never got an expiry date (see the photo_limits migration).
+  // Deleting them lists them no more, so each batch starts fresh.
+  for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
+    const { data, error } = await db.rpc("orphan_photo_paths", {
+      max_rows: BATCH,
+    })
+
+    if (error) {
+      console.error("orphan_photo_paths failed", error.message)
+      return Response.json({ error: "Could not list orphan photos.", deleted, orphans }, { status: 500 })
+    }
+
+    const paths = (data ?? []) as string[]
+
+    if (paths.length === 0) break
+
+    const { error: removeError } = await db.storage.from(BUCKET).remove(paths)
+
+    if (removeError) {
+      console.error("storage remove failed", removeError.message)
+      return Response.json({ error: "Could not delete orphan photos.", deleted, orphans }, { status: 500 })
+    }
+
+    orphans += paths.length
+
+    if (paths.length < BATCH) break
+  }
+
+  return Response.json({ deleted, orphans })
 }
 
 // Vercel Cron sends GET. Supabase pg_net can send either.

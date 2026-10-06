@@ -170,7 +170,7 @@
   "Fully paid": "ငွေအပြည့် ရှင်းပြီး",
   "Gemini could not read this image": "Gemini က ဤပုံကို ဖတ်၍ မရခဲ့ပါ",
   "Gemini did not answer in time. Try again": "Gemini က အချိန်မီ မဖြေပါ။ ပြန်ကြိုးစားပါ",
-  "Gemini is available to managers on the Pro plan": "Gemini ကို ပရို အစီအစဉ်ရှိ မန်နေဂျာများသာ သုံးနိုင်သည်",
+  "Gemini is available to owners on the Pro plan": "Gemini ကို ပရို အစီအစဉ်ရှိ ပိုင်ရှင်များသာ သုံးနိုင်သည်",
   "Gemini is busy or over its limit. Try again in a minute": "Gemini မအားလပ်ပါ သို့မဟုတ် ကန့်သတ်ချက် ကျော်သွားပါပြီ။ တစ်မိနစ်အကြာ ပြန်ကြိုးစားပါ",
   "Gemini is not set up. Add GEMINI_API_KEY to .env.local and restart the server": "Gemini ကို မတပ်ဆင်ရသေးပါ။ .env.local တွင် GEMINI_API_KEY ထည့်ပြီး ဆာဗာကို ပြန်စတင်ပါ",
   "Gemini returned an answer that could not be read": "Gemini ၏ အဖြေကို ဖတ်၍ မရခဲ့ပါ",
@@ -527,5 +527,11 @@
   "Prices in {currency}. Subject to change with notice": "စျေးနှုန်းများကို {currency} ဖြင့် ဖော်ပြထားသည်။ အသိပေးပြီး ပြောင်းလဲနိုင်သည်",
   "Thai baht": "ထိုင်းဘတ်",
   "Myanmar kyat": "မြန်မာကျပ်",
-  "Expires {date}": "{date} တွင် သက်တမ်းကုန်မည်"
+  "Expires {date}": "{date} တွင် သက်တမ်းကုန်မည်",
+  "Photos can be at most 5 MB": "ဓာတ်ပုံတစ်ပုံလျှင် ၅ MB အထိသာ ရသည်",
+  "Photo limit reached ({max} photos). Delete old photos to upload more": "ဓာတ်ပုံ ကန့်သတ်ချက် ပြည့်သွားပြီ (ဓာတ်ပုံ {max} ပုံ)။ ထပ်တင်ရန် ဓာတ်ပုံဟောင်းများကို ဖျက်ပါ",
+  "Photo limit reached ({max} photos). Delete old photos or upgrade to Pro to upload more": "ဓာတ်ပုံ ကန့်သတ်ချက် ပြည့်သွားပြီ (ဓာတ်ပုံ {max} ပုံ)။ ထပ်တင်ရန် ဓာတ်ပုံဟောင်းများကို ဖျက်ပါ သို့မဟုတ် ပရိုသို့ အဆင့်မြှင့်ပါ",
+  "Stored photos (5 MB each)": "သိမ်းထားနိုင်သော ဓာတ်ပုံများ (တစ်ပုံ ၅ MB)",
+  "30 photos": "ဓာတ်ပုံ ၃၀ ပုံ",
+  "150 photos": "ဓာတ်ပုံ ၁၅၀ ပုံ"
 }

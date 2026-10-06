@@ -67,7 +67,7 @@ function buildSections(t: T): LegalSection[] {
   {
     heading: t("Reading screenshots with AI"),
     body: [
-      t("On the Pro plan, managers can upload a chat screenshot and have Latli read it with Google's Gemini service to fill in an order. Other accounts read screenshots on their own device."),
+      t("On the Pro plan, owners can upload a chat screenshot and have Latli read it with Google's Gemini service to fill in an order. Other accounts read screenshots on their own device."),
       t("AI can make mistakes: it may misread names, phone numbers, sizes or prices, or leave things out. Always check what was filled in before you save an order. You are responsible for the orders you save."),
       t("Do not upload a screenshot unless you are allowed to share what it shows with a service provider."),
     ],

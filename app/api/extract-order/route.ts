@@ -6,7 +6,7 @@ import { canUseGemini, fetchProfile } from "@/lib/profile"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash"
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite"
 const MAX_IMAGE_CHARS = 8_000_000
 
 const PROMPT = `You read a screenshot of a customer chat (usually Facebook Messenger, often in Burmese or English) from a shop that buys products for customers in Thailand.

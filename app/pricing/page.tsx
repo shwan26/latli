@@ -30,6 +30,7 @@ const ROWS: { label: string; free: Cell; pro: Cell }[] = [
   { label: "Order screenshots read with Gemini", free: false, pro: "Owners" },
   { label: "Advanced charts", free: false, pro: true },
   { label: "Product photos kept for", free: "7 days", pro: "Up to a month" },
+  { label: "Stored photos (5 MB each)", free: "30 photos", pro: "150 photos" },
 ]
 
 const FAQS = [

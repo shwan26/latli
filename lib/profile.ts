@@ -45,7 +45,7 @@ export const DEFAULT_PROFILE: ProfileSettings = {
 // else reads screenshots on the device with Tesseract. The Gemini route checks
 // this again on the server, using the plan and role stored in Supabase.
 export function canUseGemini(profile: Pick<ProfileSettings, "plan" | "role">) {
-  return profile.plan === "pro" && profile.role === "manager"
+  return profile.plan === "pro" && profile.role === "owner"
 }
 
 // Free accounts have one currency. Pro accounts can add a second currency with

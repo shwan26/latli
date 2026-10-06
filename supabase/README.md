@@ -44,7 +44,7 @@ Follow the steps in order. It takes about 10 minutes.
 
 ## 3. Create the tables
 
-Open **SQL Editor > New query**. Run these seven files **in this order**, one
+Open **SQL Editor > New query**. Run these eight files **in this order**, one
 after the other (paste the whole file, then press Run):
 
 1. `supabase/migrations/20261003000000_profiles.sql`
@@ -83,6 +83,11 @@ after the other (paste the whole file, then press Run):
    Adds `plan_expires_at` to `profiles`: the date a Pro plan ends, shown on the
    More page. It is display only (nothing downgrades the account), and it is
    set in the SQL Editor like the plan itself (see step 7 below).
+
+8. `supabase/migrations/20261007000000_photo_limits.sql`
+   Limits stored photos per account (Free 30, Pro 150, 5 MB each) and lets the
+   daily clean-up job delete photos that were uploaded but never saved on an
+   order or product.
 
 Each file should end with "Success. No rows returned". Run each file only once.
 If one fails halfway, tell me the error message instead of running it again.
@@ -185,13 +190,13 @@ Gemini, run in the SQL Editor:
 
 ```sql
 update public.profiles
-set plan = 'pro', role = 'manager'
+set plan = 'pro', role = 'owner'
 where email = 'manager@example.com';
 ```
 
 - To show an end date on the More page, also set `plan_expires_at = '2026-12-31'`.
 - `plan = 'pro'` unlocks **Keep photos for a month**.
-- Gemini needs `plan = 'pro'` **and** `role = 'manager'`.
+- Gemini needs `plan = 'pro'` **and** `role = 'owner'`.
 
 Plan and role cannot be changed from the app, only here.
 
