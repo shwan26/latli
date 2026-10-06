@@ -2,7 +2,8 @@
 "use client"
 
 import { useState } from "react"
-import { IconEye, IconEyeOff, IconShoppingBag, IconShieldCheck, IconUserPlus } from "@tabler/icons-react"
+import Image from "next/image"
+import { IconEye, IconEyeOff, IconShieldCheck, IconUserPlus } from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -61,10 +62,15 @@ export default function LoginPage() {
           <LanguageSwitch />
         </div>
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 size-16 rounded-[20px] bg-primary flex items-center justify-center">
-            <IconShoppingBag className="size-8 text-primary-foreground" />
-          </div>
-          <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Order Manager")}</h1>
+          <Image
+            src="/logo.png"
+            alt=""
+            width={644}
+            height={434}
+            priority
+            className="mx-auto mb-3 h-16 w-auto"
+          />
+          <h1 className="sr-only">{t("Latli")}</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">{t("Manage orders, payments & deliveries")}</p>
         </div>
 

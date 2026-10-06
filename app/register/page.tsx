@@ -3,13 +3,13 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   IconEye,
   IconEyeOff,
   IconShieldCheck,
-  IconShoppingBag,
 } from "@tabler/icons-react"
 
 import { Button } from "@/components/ui/button"
@@ -143,11 +143,16 @@ export default function CreateAccountPage() {
           <LanguageSwitch />
         </div>
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 size-16 rounded-[20px] bg-primary flex items-center justify-center">
-            <IconShoppingBag className="size-8 text-primary-foreground" />
-          </div>
+          <Image
+            src="/logo.png"
+            alt=""
+            width={644}
+            height={434}
+            priority
+            className="mx-auto mb-3 h-16 w-auto"
+          />
 
-          <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Create account")}</h1>
+          <h1 className="sr-only">{t("Latli")}</h1>
 
           <p className="mt-1.5 text-sm text-muted-foreground">{t("Set up your shop to manage orders and deliveries.")}</p>
         </div>

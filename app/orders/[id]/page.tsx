@@ -13,6 +13,7 @@ import {
   IconDeviceFloppy,
   IconMessage2,
   IconTruck,
+  IconTrash,
   IconTruckDelivery,
   IconUser,
 } from "@tabler/icons-react"
@@ -25,6 +26,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -40,7 +49,7 @@ import {
   PAYMENT_STATUS_LABELS,
   type LocalOrder,
 } from "../../lib/local-orders"
-import { getOrder, updateOrder } from "@/lib/db/orders"
+import { deleteOrder, getOrder, updateOrder } from "@/lib/db/orders"
 import { listCargo } from "@/lib/db/cargo"
 import { insertProduct, insertShop, listShops } from "@/lib/db/shops"
 import { OrderProductFields, type ProductMode } from "@/components/order-product-fields"
@@ -96,6 +105,7 @@ export default function OrderDetailsPage() {
   const [error, setError] = useState("")
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [order, setOrder] = useState<LocalOrder | null>(null)
 
   const [customerName, setCustomerName] = useState("")
@@ -337,6 +347,21 @@ export default function OrderDetailsPage() {
     }
   }
 
+  async function handleDelete() {
+    if (!order) return
+
+    setConfirmingDelete(false)
+
+    try {
+      await deleteOrder(order)
+    } catch (deleteError) {
+      setError(messageOf(deleteError, t("Could not delete the order.")))
+      return
+    }
+
+    router.push("/orders")
+  }
+
   async function handleSaveOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError("")
@@ -573,6 +598,17 @@ export default function OrderDetailsPage() {
             </p>
             <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Order Details")}</h1>
           </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="ml-auto rounded-xl text-destructive hover:text-destructive"
+            aria-label={t("Delete order")}
+            onClick={() => setConfirmingDelete(true)}
+          >
+            <IconTrash className="size-5" />
+          </Button>
         </div>
       </header>
 
@@ -1027,6 +1063,25 @@ export default function OrderDetailsPage() {
           </div>
         </div>
       </form>
+
+      <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("Delete {name}?", { name: order.orderNumber })}</DialogTitle>
+            <DialogDescription>
+              {t("This permanently removes the order and its photos.")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmingDelete(false)}
+            >{t("Cancel")}</Button>
+            <Button type="button" variant="destructive" onClick={handleDelete}>{t("Delete order")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }

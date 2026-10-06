@@ -4,6 +4,11 @@ import type {
   PaymentStatus,
 } from "@/app/lib/local-orders"
 
+import { fetchProfile } from "@/lib/profile"
+import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { createClient } from "@/lib/supabase/client"
+
+import { removePhotos } from "./photos"
 import { check, fetchAllRows, getDb } from "./shared"
 
 type OrderRow = {
@@ -48,7 +53,25 @@ export type OrderInput = Omit<
   "id" | "orderNumber" | "createdAt" | "updatedAt"
 > & { orderNumber?: string; createdAt?: string }
 
-function fromRow(row: OrderRow): LocalOrder {
+// The primary currency is not stored per order. Orders always show in the
+// account's current primary currency, so changing it in Settings changes every
+// order. Without a profile (not signed in) the stored value is used.
+async function loadBaseCurrency(): Promise<LocalOrder["baseCurrency"] | null> {
+  if (!isSupabaseConfigured) return null
+
+  const profile = await fetchProfile(createClient())
+
+  return profile?.baseCurrency ?? null
+}
+
+function fromRow(
+  row: OrderRow,
+  profileBase: LocalOrder["baseCurrency"] | null
+): LocalOrder {
+  const base = profileBase ?? row.base_currency
+  // A rate of 1 marks an order with one currency only. It follows the base.
+  const singleCurrency = Number(row.exchange_rate_thb_to_mmk) === 1
+
   return {
     id: row.id,
     orderNumber: row.order_number,
@@ -58,8 +81,8 @@ function fromRow(row: OrderRow): LocalOrder {
     address: row.address,
     orderStatus: row.order_status,
     paymentStatus: row.payment_status,
-    baseCurrency: row.base_currency,
-    customerCurrency: row.customer_currency,
+    baseCurrency: base,
+    customerCurrency: singleCurrency ? base : row.customer_currency,
     exchangeRateThbToMmk: Number(row.exchange_rate_thb_to_mmk),
     totalRetailerCostThb: Number(row.total_retailer_cost_thb),
     totalCustomerPayableThb: Number(row.total_customer_payable_thb),
@@ -95,7 +118,6 @@ function toColumns(order: OrderInput) {
     address: order.address ?? "",
     order_status: order.orderStatus,
     payment_status: order.paymentStatus,
-    base_currency: order.baseCurrency,
     customer_currency: order.customerCurrency,
     exchange_rate_thb_to_mmk: order.exchangeRateThbToMmk,
     total_retailer_cost_thb: order.totalRetailerCostThb,
@@ -129,7 +151,9 @@ export async function listOrders() {
       .range(from, to)
   )
 
-  return rows.map(fromRow)
+  const base = await loadBaseCurrency()
+
+  return rows.map((row) => fromRow(row, base))
 }
 
 export async function getOrder(id: string) {
@@ -141,7 +165,7 @@ export async function getOrder(id: string) {
 
   check(error, "Could not load the order")
 
-  return data ? fromRow(data) : null
+  return data ? fromRow(data, await loadBaseCurrency()) : null
 }
 
 export async function insertOrder(order: OrderInput) {
@@ -157,7 +181,7 @@ export async function insertOrder(order: OrderInput) {
 
   check(error, "Could not save the order")
 
-  return fromRow(data!)
+  return fromRow(data!, await loadBaseCurrency())
 }
 
 export async function updateOrder(order: LocalOrder) {
@@ -170,7 +194,16 @@ export async function updateOrder(order: LocalOrder) {
 
   check(error, "Could not save the order")
 
-  return fromRow(data!)
+  return fromRow(data!, await loadBaseCurrency())
+}
+
+// Deletes the order and its photos.
+export async function deleteOrder(order: LocalOrder) {
+  const { error } = await getDb().from("orders").delete().eq("id", order.id)
+
+  check(error, "Could not delete the order")
+
+  await removePhotos([order.productPhotoPath, order.orderScreenshotPath])
 }
 
 // Copies edited customer details onto all of that customer's orders.
