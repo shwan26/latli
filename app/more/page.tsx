@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import {
   IconChevronRight,
   IconLogout,
+  IconAlertTriangle,
   IconLifebuoy,
   IconSettings,
   IconTruckDelivery,
@@ -28,6 +29,7 @@ import { supportMailto } from "@/lib/support"
 import { countCargo } from "@/lib/db/cargo"
 import { useI18n } from "@/lib/i18n/provider"
 import { LanguageSelect } from "@/components/language-select"
+import { AccountDangerZone } from "@/components/account-danger-zone"
 import { CurrencySettings } from "@/components/currency-settings"
 import { RichText } from "@/components/rich-text"
 
@@ -175,6 +177,16 @@ export default function MorePage() {
                 <RichText text={t("To upgrade to Pro, contact {email}.")} parts={{ email: <UpgradeLink account={profile} /> }} />
               </p>
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[20px] shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <IconAlertTriangle className="size-5 text-muted-foreground" />{t("Danger zone")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <AccountDangerZone />
           </CardContent>
         </Card>
 

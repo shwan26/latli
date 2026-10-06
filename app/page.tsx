@@ -1,3 +1,4 @@
+import Image from "next/image"
 import Link from "next/link"
 import {
   IconArrowRight,
@@ -64,10 +65,14 @@ export default async function Home() {
       <header className="border-b border-[#ded6c9] bg-[#fbfaf7]/90 px-5 py-4 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-[#171512] text-[#f8f2e8]">
-              <IconShoppingBag className="size-5" />
-            </span>
-            <span className="font-heading text-xl font-semibold">{t("Latli")}</span>
+            <Image
+              src="/logo.png"
+              alt={t("Latli")}
+              width={644}
+              height={434}
+              priority
+              className="h-11 w-auto"
+            />
           </Link>
 
           <div className="flex items-center gap-3">

@@ -37,7 +37,7 @@ Follow the steps in order. It takes about 10 minutes.
 - `GEMINI_API_KEY` is only used for managers on the Pro plan.
 - `SUPABASE_SERVICE_ROLE_KEY` is under **Project Settings > API > service_role**.
   It bypasses all security rules, so keep it on the server only. The app uses it
-  in one place: the photo clean-up route (step 6). Never prefix it with
+  for the photo clean-up route (step 6) and the Clear all data / Delete account routes (`app/api/account`). Never prefix it with
   `NEXT_PUBLIC_` and never commit it.
 - `CRON_SECRET` is any long random text. The clean-up route refuses callers
   that do not send it.

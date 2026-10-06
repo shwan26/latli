@@ -6,8 +6,6 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   IconAlertCircle,
-  IconArrowBackUp,
-  IconChartBar,
   IconBox,
   IconCircleCheck,
   IconPackage,
@@ -15,7 +13,6 @@ import {
   IconShoppingBag,
   IconShoppingCartOff,
   IconTruckDelivery,
-  IconWallet,
 } from "@tabler/icons-react"
 
 import { BottomNavigation } from "@/components/bottom-navigation"
@@ -27,6 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { MonthlySalesChart } from "@/components/monthly-sales-chart"
 import { Badge } from "@/components/ui/badge"
 
 import { type Currency, type LocalOrder } from "../lib/local-orders"
@@ -304,51 +302,42 @@ export default function DashboardPage() {
         <section className="space-y-3">
           <h2 className="font-heading text-lg font-medium">{t("Money")}</h2>
 
-          <DashboardMoneyCard
-            baseCurrency={baseCurrency}
-            secondCurrency={secondCurrency}
-            title={t("Total sales")}
-            description={t("Customer payable, refunds excluded")}
-            href="/orders"
-            icon={IconChartBar}
-            base={summary.totalSalesThb}
-            second={summary.totalSalesMmk}
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <MoneyBox
+              baseCurrency={baseCurrency}
+              secondCurrency={secondCurrency}
+              title={t("Total sales")}
+              href="/orders"
+              base={summary.totalSalesThb}
+              second={summary.totalSalesMmk}
+            />
+            <MoneyBox
+              baseCurrency={baseCurrency}
+              secondCurrency={secondCurrency}
+              title={t("Profit")}
+              href="/orders"
+              base={summary.profitThb}
+              second={summary.profitMmk}
+            />
+            <MoneyBox
+              baseCurrency={baseCurrency}
+              secondCurrency={secondCurrency}
+              title={t("Unpaid")}
+              href="/orders?payment=unpaid"
+              base={summary.unpaidThb}
+              second={summary.unpaidMmk}
+            />
+            <MoneyBox
+              baseCurrency={baseCurrency}
+              secondCurrency={secondCurrency}
+              title={t("Refund")}
+              href="/orders?payment=refunded"
+              base={summary.refundThb}
+              second={summary.refundMmk}
+            />
+          </div>
 
-          <DashboardMoneyCard
-            baseCurrency={baseCurrency}
-            secondCurrency={secondCurrency}
-            title={t("Profit")}
-            description={t("Owner only")}
-            href="/orders"
-            icon={IconWallet}
-            badge="Owner"
-            base={summary.profitThb}
-            second={summary.profitMmk}
-          />
-
-          <DashboardMoneyCard
-            baseCurrency={baseCurrency}
-            secondCurrency={secondCurrency}
-            title={t("Unpaid")}
-            description={`${summary.unpaidCount} ${summary.unpaidCount === 1 ? "order" : "orders"} still have balance`}
-            href="/orders?payment=unpaid"
-            icon={IconAlertCircle}
-            badge="Action"
-            base={summary.unpaidThb}
-            second={summary.unpaidMmk}
-          />
-
-          <DashboardMoneyCard
-            baseCurrency={baseCurrency}
-            secondCurrency={secondCurrency}
-            title={t("Refund")}
-            description={`${summary.refundCount} refunded ${summary.refundCount === 1 ? "order" : "orders"}`}
-            href="/orders?payment=refunded"
-            icon={IconArrowBackUp}
-            base={summary.refundThb}
-            second={summary.refundMmk}
-          />
+          <MonthlySalesChart orders={orders} currency={baseCurrency} />
         </section>
 
       </div>
@@ -397,22 +386,16 @@ function StatusMiniCard({
   )
 }
 
-function DashboardMoneyCard({
+function MoneyBox({
   title,
-  description,
   href,
-  icon: Icon,
-  badge,
   base,
   second,
   baseCurrency,
   secondCurrency,
 }: {
   title: string
-  description: string
   href: string
-  icon: React.ElementType
-  badge?: string
   base: number
   second: number
   baseCurrency: Currency
@@ -420,50 +403,17 @@ function DashboardMoneyCard({
 }) {
   return (
     <Link href={href} className="block">
-      <Card className="rounded-[20px] shadow-none transition active:scale-[0.99]">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-4">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-              <Icon className="size-5" />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="font-medium leading-none">{title}</h3>
-                  <p className="mt-1.5 text-sm text-muted-foreground">
-                    {description}
-                  </p>
-                </div>
-
-                {badge ? (
-                  <Badge variant="secondary" className="shrink-0">
-                    {badge}
-                  </Badge>
-                ) : null}
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <div className="rounded-xl border bg-background px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">{baseCurrency}</p>
-                  <p className="mt-0.5 text-sm font-semibold">
-                    {formatMoney(base, baseCurrency)}
-                  </p>
-                </div>
-
-                {secondCurrency ? (
-                  <div className="rounded-xl border bg-background px-3 py-2">
-                    <p className="text-[11px] text-muted-foreground">{secondCurrency}</p>
-                    <p className="mt-0.5 text-sm font-semibold">
-                      {formatMoney(second, secondCurrency)}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="h-full rounded-[20px] border bg-background p-4 transition active:scale-[0.99]">
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+        <p className="mt-2 break-words text-lg font-semibold">
+          {formatMoney(base, baseCurrency)}
+        </p>
+        {secondCurrency ? (
+          <p className="mt-0.5 break-words text-xs text-muted-foreground">
+            {formatMoney(second, secondCurrency)}
+          </p>
+        ) : null}
+      </div>
     </Link>
   )
 }
