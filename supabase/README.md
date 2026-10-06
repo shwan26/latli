@@ -91,14 +91,20 @@ If the bucket line fails, create it by hand: **Storage > New bucket**, name
 In **Authentication > URL Configuration**:
 
 - **Site URL**: `http://localhost:3000` (your real domain once deployed).
-- **Redirect URLs**: add `http://localhost:3000/auth/callback`, and the same
-  path on your real domain.
+- **Redirect URLs**: add `http://localhost:3000/auth/callback**`, and the same
+  path on your real domain. The `**` at the end is needed: the password reset
+  email links to `/auth/callback?next=/reset-password`, and without it Supabase
+  sends the user to the Site URL instead.
 
 In **Authentication > Sign In / Providers > Email**, choose whether new users
 must confirm their email:
 
 - **On**: users get an email link and are sent to `/auth/callback`.
 - **Off**: users are signed in as soon as they register. Easier while testing.
+
+Password reset needs no extra setup: the login page links to `/forgot-password`,
+which emails a link that opens `/reset-password`. The wording of that email is
+under **Authentication > Emails > Reset Password**.
 
 ### Security Advisor
 

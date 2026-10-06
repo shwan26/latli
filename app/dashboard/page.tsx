@@ -46,6 +46,7 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState("")
   const [baseCurrency, setBaseCurrency] = useState<Currency>("MMK")
   const [profileSecond, setProfileSecond] = useState<Currency | null>(null)
+  const [isPro, setIsPro] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -61,6 +62,7 @@ export default function DashboardPage() {
           setOrders(loaded)
 
           if (profile) {
+            setIsPro(profile.plan === "pro")
             setBaseCurrency(profile.baseCurrency)
             setProfileSecond(
               canUseSecondCurrency(profile) ? profile.secondaryCurrency : null
@@ -338,6 +340,11 @@ export default function DashboardPage() {
           </div>
 
           <MonthlySalesChart orders={orders} currency={baseCurrency} />
+          {isPro ? (
+            <Button asChild variant="outline" className="w-full rounded-xl">
+              <Link href="/dashboard/charts">{t("See more charts")}</Link>
+            </Button>
+          ) : null}
         </section>
 
       </div>
