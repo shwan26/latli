@@ -526,5 +526,6 @@
   "The first 20 shops pay {offer} per month for their first 3 months. After that Pro is {regular} per month": "ပထမဆုံး ဆိုင် ၂၀ သည် ပထမ ၃ လအတွက် တစ်လလျှင် {offer} ပေးရမည်။ ထို့နောက် ပရိုသည် တစ်လလျှင် {regular} ဖြစ်သည်",
   "Prices in {currency}. Subject to change with notice": "စျေးနှုန်းများကို {currency} ဖြင့် ဖော်ပြထားသည်။ အသိပေးပြီး ပြောင်းလဲနိုင်သည်",
   "Thai baht": "ထိုင်းဘတ်",
-  "Myanmar kyat": "မြန်မာကျပ်"
+  "Myanmar kyat": "မြန်မာကျပ်",
+  "Expires {date}": "{date} တွင် သက်တမ်းကုန်မည်"
 }

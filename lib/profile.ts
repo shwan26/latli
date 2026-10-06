@@ -16,6 +16,8 @@ export type ProfileSettings = {
   age: number | null
   gender: ProfileGender
   plan: ProfilePlan
+  // When Pro ends (ISO date). Shown only; set by an admin. Null if none is set.
+  planExpiresAt: string | null
   role: ProfileRole
   baseCurrency: Currency
   secondaryCurrency: Currency | null
@@ -32,6 +34,7 @@ export const DEFAULT_PROFILE: ProfileSettings = {
   age: null,
   gender: "",
   plan: "free",
+  planExpiresAt: null,
   role: "owner",
   baseCurrency: "MMK",
   secondaryCurrency: null,
@@ -62,6 +65,7 @@ type ProfileRow = {
   age: number | null
   gender: Exclude<ProfileGender, ""> | null
   plan: ProfilePlan
+  plan_expires_at: string | null
   role: ProfileRole
   base_currency: Currency
   secondary_currency: Currency | null
@@ -74,7 +78,7 @@ export async function fetchProfile(
 ): Promise<ProfileSettings | null> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("shop_name, owner_name, email, phone, address, age, gender, plan, role, base_currency, secondary_currency, default_exchange_rate")
+    .select("shop_name, owner_name, email, phone, address, age, gender, plan, plan_expires_at, role, base_currency, secondary_currency, default_exchange_rate")
     .maybeSingle<ProfileRow>()
 
   if (error || !data) return null
@@ -88,6 +92,7 @@ export async function fetchProfile(
     age: data.age,
     gender: data.gender ?? "",
     plan: data.plan,
+    planExpiresAt: data.plan_expires_at,
     role: data.role,
     baseCurrency: data.base_currency,
     secondaryCurrency: data.secondary_currency,

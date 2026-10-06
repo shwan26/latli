@@ -44,7 +44,7 @@ Follow the steps in order. It takes about 10 minutes.
 
 ## 3. Create the tables
 
-Open **SQL Editor > New query**. Run these six files **in this order**, one
+Open **SQL Editor > New query**. Run these seven files **in this order**, one
 after the other (paste the whole file, then press Run):
 
 1. `supabase/migrations/20261003000000_profiles.sql`
@@ -78,6 +78,11 @@ after the other (paste the whole file, then press Run):
    and `base_currency` to `orders`. Free accounts cannot set a second currency
    (the database refuses it). The `*_thb` order columns are legacy names: they
    hold amounts in the order's base currency.
+
+7. `supabase/migrations/20261006000000_plan_expiry.sql`
+   Adds `plan_expires_at` to `profiles`: the date a Pro plan ends, shown on the
+   More page. It is display only (nothing downgrades the account), and it is
+   set in the SQL Editor like the plan itself (see step 7 below).
 
 Each file should end with "Success. No rows returned". Run each file only once.
 If one fails halfway, tell me the error message instead of running it again.
@@ -184,6 +189,7 @@ set plan = 'pro', role = 'manager'
 where email = 'manager@example.com';
 ```
 
+- To show an end date on the More page, also set `plan_expires_at = '2026-12-31'`.
 - `plan = 'pro'` unlocks **Keep photos for a month**.
 - Gemini needs `plan = 'pro'` **and** `role = 'manager'`.
 

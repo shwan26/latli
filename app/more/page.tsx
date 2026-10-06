@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   IconChevronRight,
+  IconCrown,
   IconLogout,
   IconAlertTriangle,
   IconLifebuoy,
@@ -13,6 +14,7 @@ import {
   IconUser,
 } from "@tabler/icons-react"
 
+import { cn } from "@/lib/utils"
 import { BottomNavigation } from "@/components/bottom-navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -45,7 +47,7 @@ function getInitials(value: string) {
 }
 
 export default function MorePage() {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
 
   const router = useRouter()
 
@@ -78,6 +80,14 @@ export default function MorePage() {
     }
   }, [])
 
+  const isPro = profile.plan === "pro"
+  const expiryDate =
+    isPro && profile.planExpiresAt
+      ? new Intl.DateTimeFormat(lang === "my" ? "my-MM" : "en-GB", {
+          dateStyle: "long",
+        }).format(new Date(profile.planExpiresAt))
+      : ""
+
   async function handleLogout() {
     await createClient().auth.signOut()
     router.push("/login")
@@ -106,11 +116,23 @@ export default function MorePage() {
       </header>
 
       <div className="mx-auto w-full max-w-md space-y-5 px-5 py-5">
-        <Card className="rounded-[20px] shadow-none">
+        <Card
+          className={
+            isPro
+              ? "rounded-[20px] border-amber-300 bg-gradient-to-br from-amber-200 via-yellow-300 to-amber-400 text-amber-950 shadow-none dark:border-amber-500/60"
+              : "rounded-[20px] shadow-none"
+          }
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-4">
               <Avatar className="size-16 rounded-2xl">
-                <AvatarFallback className="rounded-2xl bg-primary text-lg text-primary-foreground">
+                <AvatarFallback
+                  className={
+                    isPro
+                      ? "rounded-2xl bg-amber-950 text-lg text-amber-100"
+                      : "rounded-2xl bg-primary text-lg text-primary-foreground"
+                  }
+                >
                   {getInitials(profile.ownerName || profile.shopName)}
                 </AvatarFallback>
               </Avatar>
@@ -119,16 +141,28 @@ export default function MorePage() {
                 <p className="truncate font-heading text-xl font-medium">
                   {profile.shopName || t("Order Manager")}
                 </p>
-                <p className="mt-1 truncate text-sm text-muted-foreground">
+                <p className={cn("mt-1 truncate text-sm", !isPro && "text-muted-foreground")}>
                   {profile.ownerName || t("Owner")}
                 </p>
                 {profile.email ? (
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                  <p className={cn("mt-1 truncate text-xs", !isPro && "text-muted-foreground")}>
                     {profile.email}
                   </p>
                 ) : null}
               </div>
             </div>
+
+            {isPro ? (
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-amber-950/20 pt-3 text-sm">
+                <span className="inline-flex items-center gap-1.5 font-semibold">
+                  <IconCrown className="size-4" />
+                  {t("Pro plan")}
+                </span>
+                {expiryDate ? (
+                  <span>{t("Expires {date}", { date: expiryDate })}</span>
+                ) : null}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
