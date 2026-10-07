@@ -533,5 +533,8 @@
   "Photo limit reached ({max} photos). Delete old photos or upgrade to Pro to upload more": "ဓာတ်ပုံ ကန့်သတ်ချက် ပြည့်သွားပြီ (ဓာတ်ပုံ {max} ပုံ)။ ထပ်တင်ရန် ဓာတ်ပုံဟောင်းများကို ဖျက်ပါ သို့မဟုတ် ပရိုသို့ အဆင့်မြှင့်ပါ",
   "Stored photos (5 MB each)": "သိမ်းထားနိုင်သော ဓာတ်ပုံများ (တစ်ပုံ ၅ MB)",
   "30 photos": "ဓာတ်ပုံ ၃၀ ပုံ",
-  "150 photos": "ဓာတ်ပုံ ၁၅၀ ပုံ"
+  "150 photos": "ဓာတ်ပုံ ၁၅၀ ပုံ",
+  "Request not allowed": "တောင်းဆိုမှုကို ခွင့်မပြုပါ",
+  "Wrong password": "စကားဝှက် မှားနေသည်",
+  "Enter your password to confirm": "အတည်ပြုရန် သင့်စကားဝှက်ကို ထည့်ပါ"
 }

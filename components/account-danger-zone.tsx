@@ -15,10 +15,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { CONFIRM_WORD } from "@/lib/account-confirm"
 import { createClient } from "@/lib/supabase/client"
 import { useI18n } from "@/lib/i18n/provider"
-
-const CONFIRM_WORD = "DELETE"
 
 type Action = "clear" | "delete"
 
@@ -30,6 +29,7 @@ export function AccountDangerZone() {
 
   const [action, setAction] = useState<Action | null>(null)
   const [typed, setTyped] = useState("")
+  const [password, setPassword] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const [notice, setNotice] = useState("")
@@ -37,6 +37,7 @@ export function AccountDangerZone() {
   function open(next: Action) {
     setAction(next)
     setTyped("")
+    setPassword("")
     setError("")
     setNotice("")
   }
@@ -52,7 +53,11 @@ export function AccountDangerZone() {
     setError("")
 
     try {
-      const response = await fetch(`/api/account/${action}`, { method: "POST" })
+      const response = await fetch(`/api/account/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: typed.trim(), password }),
+      })
 
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as {
@@ -74,6 +79,7 @@ export function AccountDangerZone() {
     }
 
     setBusy(false)
+    setPassword("")
     setAction(null)
 
     if (action === "delete") {
@@ -129,7 +135,7 @@ export function AccountDangerZone() {
             </DialogDescription>
           </DialogHeader>
 
-          {deleting ? (
+          {action ? (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
                 {t("Type {word} to confirm", { word: CONFIRM_WORD })}
@@ -139,6 +145,17 @@ export function AccountDangerZone() {
                 onChange={(event) => setTyped(event.target.value)}
                 aria-label={t("Type {word} to confirm", { word: CONFIRM_WORD })}
                 autoComplete="off"
+                className="h-12 rounded-xl"
+              />
+              <p className="pt-1 text-sm text-muted-foreground">
+                {t("Enter your password to confirm")}
+              </p>
+              <Input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                aria-label={t("Password")}
+                autoComplete="current-password"
                 className="h-12 rounded-xl"
               />
             </div>
@@ -157,7 +174,7 @@ export function AccountDangerZone() {
             <Button
               type="button"
               variant="destructive"
-              disabled={busy || (deleting && typed.trim() !== CONFIRM_WORD)}
+              disabled={busy || typed.trim() !== CONFIRM_WORD || !password}
               onClick={run}
             >
               {busy

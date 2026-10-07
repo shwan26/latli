@@ -4,16 +4,17 @@
 
 import {
   adminClient,
-  getSignedInUser,
+  guardDangerousRequest,
   NOT_SET_UP,
-  NOT_SIGNED_IN,
   removeAllPhotos,
 } from "@/lib/account-admin"
 
-export async function POST() {
-  const user = await getSignedInUser()
+export async function POST(request: Request) {
+  const guard = await guardDangerousRequest(request)
 
-  if (!user) return NOT_SIGNED_IN.clone()
+  if ("response" in guard) return guard.response
+
+  const { user } = guard
 
   const db = adminClient()
 
