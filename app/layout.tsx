@@ -57,17 +57,20 @@ export default async function RootLayout({
       lang={lang}
       className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", ibmPlexSans.variable, robotoHeading.variable, notoMyanmar.variable)}
     >
+      <head>
+        {/* Plain tags so the AdSense crawler sees them in the server-rendered HTML. */}
+        <meta name="google-adsense-account" content="ca-pub-4715321127483793" />
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4715321127483793"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         <I18nProvider initialLang={lang}>{children}</I18nProvider>
       </body>
       <Script
         src="https://www.googletagmanager.com/gtag/js?id=G-5R839METG7"
-        strategy="afterInteractive"
-      />
-      <Script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4715321127483793"
-        crossOrigin="anonymous"
         strategy="afterInteractive"
       />
       <Script id="google-analytics" strategy="afterInteractive">

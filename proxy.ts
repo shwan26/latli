@@ -10,6 +10,9 @@ const AUTH_PAGES = ["/login", "/register"]
 function isPublicPath(pathname: string) {
   return (
     pathname === "/" ||
+    pathname === "/ads.txt" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
     PUBLIC_PATHS.some(
       (path) => pathname === path || pathname.startsWith(`${path}/`)
     )
