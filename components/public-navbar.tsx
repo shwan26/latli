@@ -23,15 +23,15 @@ export async function PublicNavbar() {
           />
         </Link>
 
-        <nav className="flex items-center gap-3 sm:gap-4">
+        <nav className="flex items-center gap-2 sm:gap-4">
           <Link
             href="/pricing"
-            className="text-sm font-medium underline-offset-4 hover:underline"
+            className="whitespace-nowrap text-xs font-medium underline-offset-4 hover:underline sm:text-sm"
           >
             {t("Pricing")}
           </Link>
-          <LanguageSelect />
-          <Button asChild className="h-10 rounded-lg px-5 tracking-normal">
+          <LanguageSelect compact />
+          <Button asChild className="h-9 rounded-lg px-4 tracking-normal sm:h-10 sm:px-5">
             <Link href="/login">{t("Login")}</Link>
           </Button>
         </nav>

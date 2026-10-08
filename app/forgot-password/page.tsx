@@ -95,7 +95,10 @@ function ForgotPasswordForm() {
             {sent ? (
               <div className="space-y-5">
                 <Alert className="rounded-xl">
-                  <AlertDescription>{t("If an account exists for that email, we sent a reset link. Check your inbox")}</AlertDescription>
+                  <AlertDescription>
+                    {t("If an account exists for that email, we sent a reset link. Check your inbox")}
+                    <span className="mt-2 block">{t("If you can't find it in your inbox, check your spam folder")}</span>
+                  </AlertDescription>
                 </Alert>
                 <Button asChild variant="outline" className="w-full h-12 rounded-xl text-base">
                   <Link href="/login">{t("Back to login")}</Link>

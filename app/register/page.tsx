@@ -171,6 +171,7 @@ export default function CreateAccountPage() {
                 <Alert className="rounded-xl">
                   <AlertDescription>
                     {t("We sent a confirmation link to {email}. Open it to activate your account, then log in", { email: email.trim() })}
+                    <span className="mt-2 block">{t("If you can't find it in your inbox, check your spam folder")}</span>
                   </AlertDescription>
                 </Alert>
                 <Button asChild className="w-full h-12 rounded-xl text-base">
