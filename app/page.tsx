@@ -9,6 +9,7 @@ import {
   IconUsers,
 } from "@tabler/icons-react"
 
+import { PublicFooter } from "@/components/public-footer"
 import { PublicNavbar } from "@/components/public-navbar"
 import { LandingPhonePreview } from "@/components/landing-phone-preview"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,41 @@ const features = [
   "Keep customers and shops organized so you can find previous orders, prices, contacts, and repeat buyers",
   "See sales, costs, unpaid balances, refunds, and profit instead of guessing from chat messages",
   "Use monthly and customer data to see what sells, which shops perform well, and where your profit comes from",
+]
+
+// The two sections below are English only for now.
+const steps = [
+  {
+    title: "Record the order",
+    text: "When a customer confirms in chat, add the product, shop, cost, selling price and any deposit. You can also read the details from a screenshot of the chat.",
+  },
+  {
+    title: "Follow it to delivery",
+    text: "Move the order from not bought to bought, sent to cargo and delivered. Save the cargo company and tracking number so you can answer where the order is in seconds.",
+  },
+  {
+    title: "See your real profit",
+    text: "Latli adds up sales, costs, unpaid balances and refunds, then shows monthly charts of which products and shops earn the most.",
+  },
+]
+
+const faqs = [
+  {
+    question: "Who is Latli for?",
+    answer: "Small online shop owners who take orders in Facebook Messenger, LINE or Viber, buy the items from other shops, and send them to customers by cargo.",
+  },
+  {
+    question: "Is it free?",
+    answer: "Yes. The Free plan covers orders, customers, shops, payments and the profit dashboard. The Pro plan adds advanced charts, a second currency and longer photo storage.",
+  },
+  {
+    question: "Is my customers' information private?",
+    answer: "Each shop sees only its own records. We do not sell your data and we do not use your customers' details for advertising.",
+  },
+  {
+    question: "Does it work on my phone?",
+    answer: "Yes. Latli is built for phones first, so you can add an order straight after a chat ends.",
+  },
 ]
 
 export default async function Home() {
@@ -98,19 +134,40 @@ export default async function Home() {
         </div>
       </section>
 
-      <footer className="border-t border-[#ded6c9] bg-[#fbfaf7] px-5 py-6">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 text-sm text-[#605848] sm:flex-row sm:items-center sm:justify-between">
-          <p>{t("Developed by Shwan")}</p>
-          <nav className="flex items-center gap-4" aria-label={t("Legal")}>
-            <Link href="/terms" className="underline-offset-4 hover:underline">
-              {t("Terms of Service")}
-            </Link>
-            <Link href="/privacy" className="underline-offset-4 hover:underline">
-              {t("Privacy Policy")}
-            </Link>
-          </nav>
+      <section className="border-t border-[#ded6c9] bg-[#fbfaf7] px-5 py-16 md:py-20">
+        <div className="mx-auto w-full max-w-6xl">
+          <h2 className="font-heading text-4xl font-semibold leading-tight">How Latli works</h2>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {steps.map((step, index) => (
+              <div key={step.title} className="rounded-lg border border-[#ded6c9] bg-white p-5">
+                <p className="font-heading text-3xl font-semibold text-[#8a5a20]">{index + 1}</p>
+                <h3 className="mt-3 font-heading text-xl font-semibold">{step.title}</h3>
+                <p className="mt-2 leading-7 text-[#605848]">{step.text}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </footer>
+      </section>
+
+      <section className="px-5 py-16 md:py-20">
+        <div className="mx-auto w-full max-w-3xl">
+          <h2 className="font-heading text-4xl font-semibold leading-tight">Questions shop owners ask</h2>
+          <div className="mt-8 space-y-4">
+            {faqs.map((faq) => (
+              <div key={faq.question} className="rounded-lg border border-[#ded6c9] bg-[#fbfaf7] p-5">
+                <h3 className="font-heading text-lg font-semibold">{faq.question}</h3>
+                <p className="mt-2 leading-7 text-[#605848]">{faq.answer}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-8 leading-7 text-[#605848]">
+            New to running a shop from chat apps? Read our{" "}
+            <Link href="/blog" className="underline underline-offset-4">guides for shop owners</Link>.
+          </p>
+        </div>
+      </section>
+
+      <PublicFooter />
     </main>
   )
 }

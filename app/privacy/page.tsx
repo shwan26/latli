@@ -59,7 +59,7 @@ function buildSections(t: T): LegalSection[] {
         t("To fix problems, prevent misuse and meet legal duties."),
         t("To contact you about your account, for example to confirm your email, answer you or tell you about changes to our terms."),
       ],
-      t("We do not sell your information and we do not show advertising."),
+      t("We do not sell your information. Google ads may be shown on our public pages, such as the home page and the blog, but never inside your account, and your business records are never used for advertising."),
     ],
   },
   {
@@ -70,6 +70,7 @@ function buildSections(t: T): LegalSection[] {
         t("Supabase provides login, the database and file storage. Your account, records and photos are held there."),
         t("Google provides the Gemini service. This is used only when a manager on the Pro plan chooses to read a screenshot. The screenshot is sent to Gemini to extract the order details and is handled under Google's terms for that service. If you do not want a screenshot sent to Google, do not upload it on a Pro manager account. Other accounts read screenshots on their own device, and nothing is sent to Google."),
         t("Our hosting provider runs the app's servers."),
+        t("Google provides Google Analytics, which tells us how visitors use the site, and Google AdSense, which may show ads on our public pages. These services may use cookies or similar technologies on your device. See below for your choices."),
       ],
       t("We may also share information if the law requires it, to protect people's safety or our rights, or as part of a sale or transfer of our business, in which case we will tell you."),
     ],
@@ -84,7 +85,8 @@ function buildSections(t: T): LegalSection[] {
   {
     heading: t("Cookies"),
     body: [
-      t("Latli uses only the cookies needed to keep you signed in. They are essential, so the app cannot work without them. We do not use advertising or tracking cookies."),
+      t("Latli uses cookies that are needed to keep you signed in and to remember your language. They are essential, so the app cannot work without them."),
+      t("Google Analytics and Google AdSense may also set cookies to measure visits and to show and measure ads on our public pages. Google may use them to show personalised ads based on your visits to this and other sites. You can manage this at https://adssettings.google.com or learn how Google uses information from sites that use its services at https://policies.google.com/technologies/partner-sites. You can also block cookies in your browser settings, although parts of Latli may then stop working."),
     ],
   },
   {
