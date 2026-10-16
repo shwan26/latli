@@ -41,7 +41,7 @@ function buildSections(t: T): LegalSection[] {
       t("Latli has a Free plan and a Pro plan. Plans differ in the features they include, such as how long photos are kept and whether screenshots can be read with AI."),
       [
         t("Free: photos are deleted 7 days after they are saved."),
-        t("Pro: photos are also deleted after 7 days unless you choose Keep photos for a month. That keeps them for 30 days from the day you press it, and you can press it again later to extend them."),
+        t("Pro: photos are also deleted after 7 days unless you choose Keep photos for 3 months. That keeps them for 3 months from the day you press it, and you can press it again later to extend them."),
         t("Pro: managers can have order screenshots read with Gemini (see section 7)."),
       ],
       t("Plans, features and any price may change. We will tell you before a change that makes your plan worse. Your plan is set on your account by us, and you cannot change it yourself."),

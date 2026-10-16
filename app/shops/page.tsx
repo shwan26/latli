@@ -318,7 +318,7 @@ export default function ShopsPage() {
 
         return next
       })
-    }, t("Photos will be kept for a month"))
+    }, t("Photos will be kept for 3 months"))
   }
 
   async function handleRemoveProduct(product: LocalShopProduct) {
@@ -697,7 +697,7 @@ function ShopDetail({
                 t("Product photos are deleted 7 days after they are saved")
               ) : (
                 <RichText
-                  text={t("Product photos are deleted 7 days after they are saved. Pro accounts can keep them for a month. To upgrade, contact {email}")}
+                  text={t("Product photos are deleted 7 days after they are saved. Pro accounts can keep them for 3 months. To upgrade, contact {email}")}
                   parts={{ email: <UpgradeLink account={account ?? undefined} /> }}
                 />
               )}
@@ -710,7 +710,7 @@ function ShopDetail({
                 disabled={busy}
                 onClick={onKeepPhotos}
               >
-                {busy ? t("Saving...") : t("Keep photos for a month")}
+                {busy ? t("Saving...") : t("Keep photos for 3 months")}
               </Button>
             ) : null}
           </div>

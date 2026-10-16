@@ -678,11 +678,11 @@ export default function OrderDetailsPage() {
                     disabled={keeping}
                     onClick={handleKeepPhotos}
                   >
-                    {keeping ? t("Saving...") : t("Keep photos for a month")}
+                    {keeping ? t("Saving...") : t("Keep photos for 3 months")}
                   </Button>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    <RichText text={t("Pro accounts can keep photos for a month. To upgrade, contact {email}")} parts={{ email: <UpgradeLink account={account ?? undefined} /> }} />
+                    <RichText text={t("Pro accounts can keep photos for 3 months. To upgrade, contact {email}")} parts={{ email: <UpgradeLink account={account ?? undefined} /> }} />
                   </p>
                 )}
               </div>

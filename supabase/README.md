@@ -6,7 +6,7 @@ Latli uses Supabase for:
 - **Database**: profiles, customers, shops, shop products, cargo companies and
   orders. Each user sees only their own rows (row level security).
 - **Storage**: a private `photos` bucket for order and product photos. Photos
-  are deleted after 7 days. Pro accounts can keep them for a month.
+  are deleted after 7 days. Pro accounts can keep them for 3 months.
 
 Follow the steps in order. It takes about 10 minutes.
 
@@ -57,14 +57,14 @@ after the other (paste the whole file, then press Run):
    with its access rules.
 3. `supabase/migrations/20261003020000_photo_retention.sql`
    Photo retention. Every photo is deleted 7 days after it is saved. A Pro
-   account can press **Keep photos for a month** (30 days from that click, and
+   account can press **Keep photos for 3 months** (3 months from that click, and
    it can be pressed again later). Dates are kept in `photo_expiry`, which users
    can read but not change, so nobody can extend their own photos from the
    browser.
 
 4. `supabase/migrations/20261003030000_security_fixes.sql`
    Security Advisor fixes: stops the internal trigger functions from being
-   callable over the API, and makes "Keep photos for a month" a normal function
+   callable over the API, and makes "Keep photos for 3 months" a normal function
    that follows the security rules instead of bypassing them. Run it even on a
    project that already has the first three files.
 
@@ -88,6 +88,9 @@ after the other (paste the whole file, then press Run):
    Limits stored photos per account (Free 30, Pro 150, 5 MB each) and lets the
    daily clean-up job delete photos that were uploaded but never saved on an
    order or product.
+
+9. `supabase/migrations/20261016000000_photo_keep_3_months.sql`
+   Pro accounts can keep photos for 3 months instead of 30 days.
 
 Each file should end with "Success. No rows returned". Run each file only once.
 If one fails halfway, tell me the error message instead of running it again.
@@ -195,7 +198,7 @@ where email = 'manager@example.com';
 ```
 
 - To show an end date on the More page, also set `plan_expires_at = '2026-12-31'`.
-- `plan = 'pro'` unlocks **Keep photos for a month**.
+- `plan = 'pro'` unlocks **Keep photos for 3 months**.
 - Gemini needs `plan = 'pro'` **and** `role = 'owner'`.
 
 Plan and role cannot be changed from the app, only here.

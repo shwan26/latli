@@ -112,7 +112,7 @@ export async function getPhotoExpiry(paths: (string | undefined | null)[]) {
   return expiry
 }
 
-// Pro accounts only: keeps these photos for 30 days from now. Returns the new
+// Pro accounts only: keeps these photos for 3 months from now. Returns the new
 // date. The database refuses the call for free accounts.
 export async function keepPhotosLonger(paths: (string | undefined | null)[]) {
   const unique = [...new Set(paths.filter((path): path is string => !!path))]

@@ -779,7 +779,7 @@ export default function CreateOrderPage() {
               onChange={handleScreenshotChange}
             />
             <p className="text-xs text-muted-foreground">
-              <RichText text={t("Photos are deleted 7 days after you save the order. Pro accounts can keep them for a month from the order page. To upgrade, contact {email}")} parts={{ email: <UpgradeLink /> }} />
+              <RichText text={t("Photos are deleted 7 days after you save the order. Pro accounts can keep them for 3 months from the order page. To upgrade, contact {email}")} parts={{ email: <UpgradeLink /> }} />
             </p>
 
             {screenshotPreview ? (

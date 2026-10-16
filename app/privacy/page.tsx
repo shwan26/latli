@@ -78,7 +78,7 @@ function buildSections(t: T): LegalSection[] {
   {
     heading: t("Photos and how long we keep them"),
     body: [
-      t("Photos and screenshots are stored in a private location that only you can reach. They are deleted automatically 7 days after they are saved. Accounts on the Pro plan can press Keep photos for a month, which keeps them for 30 days from that day, and can press it again to extend them."),
+      t("Photos and screenshots are stored in a private location that only you can reach. They are deleted automatically 7 days after they are saved. Accounts on the Pro plan can press Keep photos for 3 months, which keeps them for 3 months from that day, and can press it again to extend them."),
       t("Once a photo is deleted it cannot be recovered. The order or product it belonged to stays, without the photo."),
     ],
   },
@@ -94,7 +94,7 @@ function buildSections(t: T): LegalSection[] {
     body: [
       [
         t("Account details and business records: until you ask us to delete your account."),
-        t("Photos and screenshots: 7 days, or up to 30 days from the day a Pro account chooses to keep them, as described above."),
+        t("Photos and screenshots: 7 days, or up to 3 months from the day a Pro account chooses to keep them, as described above."),
         t("Backups and logs kept by our providers may hold information for a short time after it is deleted."),
       ],
       t("When your account is deleted, your profile and records are deleted with it. We may keep a small amount of information if the law requires it."),

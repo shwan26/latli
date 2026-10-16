@@ -21,7 +21,7 @@ A typical day for these sellers: a customer sends a screenshot of a product in a
 - **Orders.** Search by order ID, customer, shop or product, and filter by order status, payment status, shop and date range. Each order has an auto-numbered ID (`ORD-0001`), its own status and payment tracking, a shop, a cargo company and photos.
 - **Read a chat screenshot to fill the form.** Upload the Messenger screenshot and the form is filled in for you. Pro managers use Google Gemini on the server. Everyone else uses on-device OCR (Tesseract.js), so the feature works without sending images to a third party. The user always reviews before saving.
 - **Customers, shops and cargo.** Saved customers (matched to orders by phone, Facebook name or name), shops with their own product catalogues and photos, and cargo companies. New customers, shops and products can also be created while writing an order.
-- **Photo retention.** Photos are private and deleted after 7 days. Pro accounts can keep them for a month. The dates are enforced in the database, not in the browser.
+- **Photo retention.** Photos are private and deleted after 7 days. Pro accounts can keep them for 3 months. The dates are enforced in the database, not in the browser.
 - **Burmese and English.** Full UI translation with an MM / ENG switch, a translation completeness check, and Burmese-aware date formatting.
 - **Accounts.** Email and password sign-up with terms acceptance, email confirmation, and profile settings.
 
@@ -38,7 +38,7 @@ A typical day for these sellers: a customer sends a screenshot of a product in a
 
 ## Engineering highlights
 
-- **Security in the database.** Every table has Row Level Security so each user can only see their own rows. Plan and role can't be changed from the client. The photo-expiry table is read-only to users, and "keep for a month" is a function that follows the same security rules. The Supabase Security Advisor is clean apart from one paid-plan setting.
+- **Security in the database.** Every table has Row Level Security so each user can only see their own rows. Plan and role can't be changed from the client. The photo-expiry table is read-only to users, and "keep for 3 months" is a function that follows the same security rules. The Supabase Security Advisor is clean apart from one paid-plan setting.
 - **Server-checked AI access.** The Gemini route checks the signed-in user's plan and role on the server every time. The API key never reaches the browser.
 - **Migrations as the source of truth.** The schema, triggers (profile creation, order numbering, `updated_at`), storage policies and retention logic live in versioned SQL files in `supabase/migrations`, with a step-by-step setup guide.
 - **Photo lifecycle.** Private bucket, signed URLs, per-photo expiry records, and a protected cron route that deletes expired files with the service role key.

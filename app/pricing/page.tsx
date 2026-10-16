@@ -29,7 +29,7 @@ const ROWS: { label: string; free: Cell; pro: Cell }[] = [
   { label: "Currencies", free: "1 currency", pro: "2 with exchange rate" },
   { label: "Order screenshots read with Gemini", free: false, pro: "Owners" },
   { label: "Advanced charts", free: false, pro: true },
-  { label: "Product photos kept for", free: "7 days", pro: "Up to a month" },
+  { label: "Product photos kept for", free: "7 days", pro: "Up to 3 months" },
   { label: "Stored photos (5 MB each)", free: "30 photos", pro: "150 photos" },
 ]
 
