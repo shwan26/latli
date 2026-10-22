@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
+  IconArrowLeft,
   IconMapPin,
   IconPackage,
   IconPencil,
@@ -353,15 +354,20 @@ export default function ShopsPage() {
   return (
     <main className="min-h-dvh bg-muted pb-24">
       <header className="sticky top-0 z-20 border-b bg-background/95 px-5 py-4 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
-          <div>
+        <div className="mx-auto flex w-full max-w-md items-center gap-3">
+          <Button asChild variant="ghost" size="icon" className="-ml-2 rounded-xl">
+            <Link href="/data" aria-label={t("Back to data")}>
+              <IconArrowLeft className="size-5" />
+            </Link>
+          </Button>
+          <div className="min-w-0 flex-1">
             <p className="text-sm text-muted-foreground">
               {t(shops.length === 1 ? "{count} shop" : "{count} shops", { count: shops.length })}
             </p>
             <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Shops")}</h1>
           </div>
 
-          <Button asChild size="icon" className="size-11 rounded-xl">
+          <Button asChild size="icon" className="size-11 shrink-0 rounded-xl">
             <Link href="/shops/new" aria-label={t("Add shop")}>
               <IconPlus className="size-5" />
             </Link>
@@ -521,7 +527,7 @@ export default function ShopsPage() {
         </DialogContent>
       </Dialog>
 
-      <BottomNavigation active="shops" />
+      <BottomNavigation active="data" />
     </main>
   )
 }

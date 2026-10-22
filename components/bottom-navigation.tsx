@@ -2,16 +2,16 @@
 
 import Link from "next/link"
 import {
-  IconBuildingStore,
   IconChartBar,
-  IconDots,
+  IconDatabase,
   IconPackage,
-  IconUsers,
+  IconPlus,
+  IconSettings,
 } from "@tabler/icons-react"
 import { useI18n } from "@/lib/i18n/provider"
 
 type BottomNavigationProps = {
-  active: "dashboard" | "orders" | "shops" | "customers" | "more"
+  active: "dashboard" | "orders" | "data" | "settings"
 }
 
 export function BottomNavigation({ active }: BottomNavigationProps) {
@@ -19,7 +19,7 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 px-4 pb-4 pt-2 backdrop-blur">
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+      <div className="mx-auto grid max-w-md grid-cols-5 items-end gap-1">
         <BottomNavItem
           href="/dashboard"
           label={t("Dashboard")}
@@ -32,20 +32,27 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
           <IconPackage className="size-5" />
         </BottomNavItem>
 
-        <BottomNavItem href="/shops" label={t("Shops")} active={active === "shops"}>
-          <IconBuildingStore className="size-5" />
+        <Link
+          href="/orders/create"
+          aria-label={t("Add order")}
+          className="flex flex-col items-center gap-1 text-muted-foreground"
+        >
+          <span className="-mt-7 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background">
+            <IconPlus className="size-7" />
+          </span>
+          <span className="text-[11px] leading-none">{t("Add order")}</span>
+        </Link>
+
+        <BottomNavItem href="/data" label={t("Data")} active={active === "data"}>
+          <IconDatabase className="size-5" />
         </BottomNavItem>
 
         <BottomNavItem
-          href="/customers"
-          label={t("Customers")}
-          active={active === "customers"}
+          href="/settings"
+          label={t("Settings")}
+          active={active === "settings"}
         >
-          <IconUsers className="size-5" />
-        </BottomNavItem>
-
-        <BottomNavItem href="/more" label={t("More")} active={active === "more"}>
-          <IconDots className="size-5" />
+          <IconSettings className="size-5" />
         </BottomNavItem>
       </div>
     </nav>

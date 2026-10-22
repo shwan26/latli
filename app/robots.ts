@@ -18,6 +18,8 @@ export default function robots(): MetadataRoute.Robots {
           "/cargo",
           "/profile",
           "/more",
+          "/data",
+          "/settings",
           "/reset-password",
         ],
       },
