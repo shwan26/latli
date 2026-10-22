@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
+  IconArrowLeft,
   IconMapPin,
   IconPackage,
   IconPencil,
@@ -55,7 +56,6 @@ import { formatMoney } from "../lib/currency"
 import {
   getPhotoExpiry,
   getPhotoUrls,
-  keepPhotosLonger,
   removePhotos,
   uploadPhoto,
 } from "@/lib/db/photos"
@@ -301,26 +301,6 @@ export default function ShopsPage() {
     if (saved) setProductDraft(emptyProductDraft)
   }
 
-  async function handleKeepPhotos() {
-    if (!selectedShop) return
-
-    const paths = selectedShop.products
-      .map((product) => product.imagePath)
-      .filter((path): path is string => !!path)
-
-    await run(async () => {
-      const until = await keepPhotosLonger(paths)
-
-      setPhotoExpiry((current) => {
-        const next = { ...current }
-
-        for (const path of paths) next[path] = until
-
-        return next
-      })
-    }, t("Photos will be kept for 3 months"))
-  }
-
   async function handleRemoveProduct(product: LocalShopProduct) {
     if (!selectedShop) return
 
@@ -353,15 +333,20 @@ export default function ShopsPage() {
   return (
     <main className="min-h-dvh bg-muted pb-24">
       <header className="sticky top-0 z-20 border-b bg-background/95 px-5 py-4 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
-          <div>
+        <div className="mx-auto flex w-full max-w-md items-center gap-3">
+          <Button asChild variant="ghost" size="icon" className="-ml-2 rounded-xl">
+            <Link href="/data" aria-label={t("Back to data")}>
+              <IconArrowLeft className="size-5" />
+            </Link>
+          </Button>
+          <div className="min-w-0 flex-1">
             <p className="text-sm text-muted-foreground">
               {t(shops.length === 1 ? "{count} shop" : "{count} shops", { count: shops.length })}
             </p>
             <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Shops")}</h1>
           </div>
 
-          <Button asChild size="icon" className="size-11 rounded-xl">
+          <Button asChild size="icon" className="size-11 shrink-0 rounded-xl">
             <Link href="/shops/new" aria-label={t("Add shop")}>
               <IconPlus className="size-5" />
             </Link>
@@ -470,7 +455,6 @@ export default function ShopsPage() {
               photoExpiry={photoExpiry}
               isPro={isPro}
               account={account}
-              onKeepPhotos={handleKeepPhotos}
               errorMessage={errorMessage}
               savedMessage={savedMessage}
               onEditChange={(key, value) =>
@@ -521,7 +505,7 @@ export default function ShopsPage() {
         </DialogContent>
       </Dialog>
 
-      <BottomNavigation active="shops" />
+      <BottomNavigation active="data" />
     </main>
   )
 }
@@ -536,7 +520,6 @@ function ShopDetail({
   photoExpiry,
   isPro,
   account,
-  onKeepPhotos,
   errorMessage,
   savedMessage,
   onEditChange,
@@ -557,7 +540,6 @@ function ShopDetail({
   photoExpiry: Record<string, string>
   isPro: boolean
   account: ProfileSettings | null
-  onKeepPhotos: () => void
   errorMessage: string
   savedMessage: string
   onEditChange: (key: keyof ShopDraft, value: string) => void
@@ -694,25 +676,14 @@ function ShopDetail({
           <div className="space-y-2 rounded-2xl border p-3">
             <p className="text-sm text-muted-foreground">
               {isPro ? (
-                t("Product photos are deleted 7 days after they are saved")
+                t("Product photos are kept for 6 months after they are saved")
               ) : (
                 <RichText
-                  text={t("Product photos are deleted 7 days after they are saved. Pro accounts can keep them for 3 months. To upgrade, contact {email}")}
+                  text={t("Product photos are kept for 90 days after they are saved. Pro accounts keep them for 6 months. To upgrade, contact {email}")}
                   parts={{ email: <UpgradeLink account={account ?? undefined} /> }}
                 />
               )}
             </p>
-            {isPro ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 w-full rounded-xl"
-                disabled={busy}
-                onClick={onKeepPhotos}
-              >
-                {busy ? t("Saving...") : t("Keep photos for 3 months")}
-              </Button>
-            ) : null}
           </div>
         ) : null}
 
@@ -911,7 +882,7 @@ function ProductImageInput({
         className="h-12 rounded-xl text-base"
       />
 
-      <p className="text-xs text-muted-foreground">{t("Photos are deleted 7 days after they are saved")}</p>
+      <p className="text-xs text-muted-foreground">{t("Photos are kept for 90 days on Free and 6 months on Pro")}</p>
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>

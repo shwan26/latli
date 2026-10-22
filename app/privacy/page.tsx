@@ -59,7 +59,7 @@ function buildSections(t: T): LegalSection[] {
         t("To fix problems, prevent misuse and meet legal duties."),
         t("To contact you about your account, for example to confirm your email, answer you or tell you about changes to our terms."),
       ],
-      t("We do not sell your information. Google ads may be shown on our public pages, such as the home page and the blog, but never inside your account, and your business records are never used for advertising."),
+      t("We do not sell your information, we do not show ads, and your business records are never used for advertising."),
     ],
   },
   {
@@ -68,9 +68,10 @@ function buildSections(t: T): LegalSection[] {
       t("We use service providers to run Latli. They may handle your information only to provide their service to us."),
       [
         t("Supabase provides login, the database and file storage. Your account, records and photos are held there."),
-        t("Google provides the Gemini service. This is used only when a manager on the Pro plan chooses to read a screenshot. The screenshot is sent to Gemini to extract the order details and is handled under Google's terms for that service. If you do not want a screenshot sent to Google, do not upload it on a Pro manager account. Other accounts read screenshots on their own device, and nothing is sent to Google."),
+        t("Google provides the Gemini service. This is used only when you agree to it for a screenshot you upload: the app asks first. The screenshot is then sent to Gemini to extract the order details and is handled under Google's terms for that service. Free accounts can do this 10 times a month. If you say no, or do not agree, the screenshot is read on your own device and nothing is sent to Google."),
         t("Our hosting provider runs the app's servers."),
-        t("Google provides Google Analytics, which tells us how visitors use the site, and Google AdSense, which may show ads on our public pages. These services may use cookies or similar technologies on your device. See below for your choices."),
+        t("Meta provides Facebook Messenger. If you choose to message us there, your messages are handled by Meta under its terms."),
+        t("Google provides Google Analytics, which tells us how visitors use the site. It may use cookies or similar technologies on your device. See below for your choices."),
       ],
       t("We may also share information if the law requires it, to protect people's safety or our rights, or as part of a sale or transfer of our business, in which case we will tell you."),
     ],
@@ -78,7 +79,7 @@ function buildSections(t: T): LegalSection[] {
   {
     heading: t("Photos and how long we keep them"),
     body: [
-      t("Photos and screenshots are stored in a private location that only you can reach. They are deleted automatically 7 days after they are saved. Accounts on the Pro plan can press Keep photos for 3 months, which keeps them for 3 months from that day, and can press it again to extend them."),
+      t("Photos and screenshots are stored in a private location that only you can reach. They are deleted automatically 90 days after they are saved on the Free plan, and 6 months after they are saved on the Pro plan. If a Pro plan ends, photos that would last longer are deleted 90 days after it ends."),
       t("Once a photo is deleted it cannot be recovered. The order or product it belonged to stays, without the photo."),
     ],
   },
@@ -86,7 +87,7 @@ function buildSections(t: T): LegalSection[] {
     heading: t("Cookies"),
     body: [
       t("Latli uses cookies that are needed to keep you signed in and to remember your language. They are essential, so the app cannot work without them."),
-      t("Google Analytics and Google AdSense may also set cookies to measure visits and to show and measure ads on our public pages. Google may use them to show personalised ads based on your visits to this and other sites. You can manage this at https://adssettings.google.com or learn how Google uses information from sites that use its services at https://policies.google.com/technologies/partner-sites. You can also block cookies in your browser settings, although parts of Latli may then stop working."),
+      t("Google Analytics may also set cookies to measure visits to our public pages. You can learn how Google uses information from sites that use its services at https://policies.google.com/technologies/partner-sites. You can also block cookies in your browser settings, although parts of Latli may then stop working."),
     ],
   },
   {
@@ -94,7 +95,7 @@ function buildSections(t: T): LegalSection[] {
     body: [
       [
         t("Account details and business records: until you ask us to delete your account."),
-        t("Photos and screenshots: 7 days, or up to 3 months from the day a Pro account chooses to keep them, as described above."),
+        t("Photos and screenshots: 90 days on the Free plan and 6 months on the Pro plan, as described above."),
         t("Backups and logs kept by our providers may hold information for a short time after it is deleted."),
       ],
       t("When your account is deleted, your profile and records are deleted with it. We may keep a small amount of information if the law requires it."),

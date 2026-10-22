@@ -41,11 +41,28 @@ export const DEFAULT_PROFILE: ProfileSettings = {
   defaultExchangeRate: null,
 }
 
-// Screenshot reading with Gemini is for managers on the Pro plan. Everyone
-// else reads screenshots on the device with Tesseract. The Gemini route checks
-// this again on the server, using the plan and role stored in Supabase.
-export function canUseGemini(profile: Pick<ProfileSettings, "plan" | "role">) {
-  return profile.plan === "pro" && profile.role === "owner"
+// Every account can read screenshots with Gemini. Free accounts get this many
+// reads a month, Pro accounts are not limited. The database enforces the limit
+// (see the ai_usage migration); this number is only for display.
+export const FREE_AI_READS_PER_MONTH = 10
+
+// AI reads used this month. max is null when there is no limit (Pro).
+export type AiQuota = { used: number; max: number | null }
+
+export function aiReadsLeft(quota: AiQuota) {
+  return quota.max === null ? Infinity : Math.max(quota.max - quota.used, 0)
+}
+
+export async function fetchAiQuota(
+  supabase: SupabaseClient
+): Promise<AiQuota | null> {
+  const { data, error } = await supabase
+    .rpc("ai_quota")
+    .single<{ used: number; max: number | null }>()
+
+  if (error || !data) return null
+
+  return { used: data.used, max: data.max }
 }
 
 // Free accounts have one currency. Pro accounts can add a second currency with

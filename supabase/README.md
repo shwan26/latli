@@ -6,7 +6,7 @@ Latli uses Supabase for:
 - **Database**: profiles, customers, shops, shop products, cargo companies and
   orders. Each user sees only their own rows (row level security).
 - **Storage**: a private `photos` bucket for order and product photos. Photos
-  are deleted after 7 days. Pro accounts can keep them for 3 months.
+  are deleted after 90 days (Free) or 6 months (Pro).
 
 Follow the steps in order. It takes about 10 minutes.
 
@@ -34,7 +34,12 @@ Follow the steps in order. It takes about 10 minutes.
 
 4. Restart `pnpm dev` after changing this file.
 
-- `GEMINI_API_KEY` is only used for managers on the Pro plan.
+- `NEXT_PUBLIC_FACEBOOK_PAGE` (optional) is your Facebook Page username, for
+  example `latli.app`. It turns on the Messenger chat button on the public pages.
+- `GEMINI_API_KEY` reads order screenshots for every account. Free accounts get 10 reads a month, Pro accounts are not limited.
+  Optional: `GEMINI_MODEL` (default `gemini-3.1-flash-lite`) and
+  `GEMINI_FALLBACK_MODELS` (default `gemini-2.5-flash-lite,gemini-3-flash`). When
+  a model is busy (429/5xx) or does not answer, the next one is tried.
 - `SUPABASE_SERVICE_ROLE_KEY` is under **Project Settings > API > service_role**.
   It bypasses all security rules, so keep it on the server only. The app uses it
   for the photo clean-up route (step 6) and the Clear all data / Delete account routes (`app/api/account`). Never prefix it with
@@ -44,7 +49,7 @@ Follow the steps in order. It takes about 10 minutes.
 
 ## 3. Create the tables
 
-Open **SQL Editor > New query**. Run these eight files **in this order**, one
+Open **SQL Editor > New query**. Run these eleven files **in this order**, one
 after the other (paste the whole file, then press Run):
 
 1. `supabase/migrations/20261003000000_profiles.sql`
@@ -91,6 +96,15 @@ after the other (paste the whole file, then press Run):
 
 9. `supabase/migrations/20261016000000_photo_keep_3_months.sql`
    Pro accounts can keep photos for 3 months instead of 30 days.
+
+10. `supabase/migrations/20261022000000_ai_usage.sql`
+    Counts AI screenshot reads per month (`ai_usage`). Free accounts are
+    limited to 10 a month; Pro accounts are counted but not limited.
+
+11. `supabase/migrations/20261023000000_photo_retention_90_days.sql`
+    Photos are kept 90 days (Free) or 6 months (Pro) from when they are saved.
+    A plan change moves the dates of photos already saved. Removes the
+    "Keep photos for 3 months" button.
 
 Each file should end with "Success. No rows returned". Run each file only once.
 If one fails halfway, tell me the error message instead of running it again.
@@ -186,10 +200,10 @@ In the app:
 4. Register a second account in a private window. It must not see the first
    account's data.
 
-## 7. Give someone Gemini or Pro access
+## 7. Give someone Pro access
 
-New accounts are `free` / `owner`. To let a manager read order screenshots with
-Gemini, run in the SQL Editor:
+New accounts are `free` / `owner`. Every account can read screenshots with
+Gemini (Free: 10 a month). To lift that limit, run in the SQL Editor:
 
 ```sql
 update public.profiles
@@ -198,8 +212,8 @@ where email = 'manager@example.com';
 ```
 
 - To show an end date on the More page, also set `plan_expires_at = '2026-12-31'`.
-- `plan = 'pro'` unlocks **Keep photos for 3 months**.
-- Gemini needs `plan = 'pro'` **and** `role = 'owner'`.
+- `plan = 'pro'` keeps photos for 6 months instead of 90 days. Changing the plan moves the dates of photos already saved: going back to Free deletes longer-kept photos 90 days later.
+- `plan = 'pro'` removes the 10 AI reads a month limit.
 
 Plan and role cannot be changed from the app, only here.
 

@@ -62,7 +62,6 @@ import type {
 import {
   getPhotoExpiry,
   getPhotoUrls,
-  keepPhotosLonger,
   removePhotos,
   uploadPhoto,
 } from "@/lib/db/photos"
@@ -73,7 +72,7 @@ import { fetchProfile, type ProfileSettings } from "@/lib/profile"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
 import { messageOf } from "@/lib/db/shared"
-import { resizeImageToDataUrl } from "../../lib/image-resize"
+import { photoSizeFor, resizeImageToDataUrl } from "../../lib/image-resize"
 import { formatMoney } from "../../lib/currency"
 import { useI18n } from "@/lib/i18n/provider"
 import { dateLocale, translate } from "@/lib/i18n/runtime"
@@ -143,8 +142,8 @@ export default function OrderDetailsPage() {
   const [selectedProductId, setSelectedProductId] = useState("")
   const [photoExpiresAt, setPhotoExpiresAt] = useState("")
   const [isPro, setIsPro] = useState(false)
+  const photo = photoSizeFor(isPro)
   const [account, setAccount] = useState<ProfileSettings | null>(null)
-  const [keeping, setKeeping] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -271,7 +270,7 @@ export default function OrderDetailsPage() {
     }
 
     try {
-      setNewPhotoDataUrl(await resizeImageToDataUrl(file, 1600, 0.8))
+      setNewPhotoDataUrl(await resizeImageToDataUrl(file, photo.maxSide, photo.quality))
       setNewPhotoName(file.name)
     } catch {
       setError(t("Could not preview the image. Please choose another image"))
@@ -298,7 +297,7 @@ export default function OrderDetailsPage() {
     }
 
     try {
-      setNewScreenshotDataUrl(await resizeImageToDataUrl(file, 1600, 0.8))
+      setNewScreenshotDataUrl(await resizeImageToDataUrl(file, photo.maxSide, photo.quality))
     } catch {
       setError(t("Could not preview the image. Please choose another image"))
       event.target.value = ""
@@ -328,23 +327,6 @@ export default function OrderDetailsPage() {
     setSelectedShopId(id)
     setSelectedProductId("")
     setProductMode("new")
-  }
-
-  async function handleKeepPhotos() {
-    if (!order) return
-
-    setError("")
-    setKeeping(true)
-
-    try {
-      setPhotoExpiresAt(
-        await keepPhotosLonger([order.productPhotoPath, order.orderScreenshotPath])
-      )
-    } catch (keepError) {
-      setError(messageOf(keepError, t("Could not keep the photos longer")))
-    } finally {
-      setKeeping(false)
-    }
   }
 
   async function handleDelete() {
@@ -668,21 +650,15 @@ export default function OrderDetailsPage() {
                           day: "numeric",
                         }),
                       })
-                    : t("Photos are deleted 7 days after they are saved")}
+                    : t(
+                        isPro
+                          ? "Photos are kept for 6 months after they are saved"
+                          : "Photos are kept for 90 days after they are saved"
+                      )}
                 </p>
-                {isPro ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11 w-full rounded-xl"
-                    disabled={keeping}
-                    onClick={handleKeepPhotos}
-                  >
-                    {keeping ? t("Saving...") : t("Keep photos for 3 months")}
-                  </Button>
-                ) : (
+                {isPro ? null : (
                   <p className="text-xs text-muted-foreground">
-                    <RichText text={t("Pro accounts can keep photos for 3 months. To upgrade, contact {email}")} parts={{ email: <UpgradeLink account={account ?? undefined} /> }} />
+                    <RichText text={t("Pro accounts keep photos for 6 months. To upgrade, contact {email}")} parts={{ email: <UpgradeLink account={account ?? undefined} /> }} />
                   </p>
                 )}
               </div>

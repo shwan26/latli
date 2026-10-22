@@ -126,7 +126,7 @@ export default function ProfilePage() {
       <header className="sticky top-0 z-20 border-b bg-background/95 px-5 py-4 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md items-center gap-3">
           <Button asChild variant="ghost" size="icon" className="rounded-xl">
-            <Link href="/more" aria-label={t("Back to more")}>
+            <Link href="/settings" aria-label={t("Back to settings")}>
               <IconArrowLeft className="size-5" />
             </Link>
           </Button>
@@ -291,7 +291,7 @@ export default function ProfilePage() {
         </Card>
       </div>
 
-      <BottomNavigation active="more" />
+      <BottomNavigation active="settings" />
     </main>
   )
 }

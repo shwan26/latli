@@ -17,12 +17,23 @@ import {
   IconUser,
 } from "@tabler/icons-react"
 
-import { OrderProductFields, type ProductMode } from "@/components/order-product-fields"
+import {
+  OrderProductFields,
+  ProductPhotoField,
+  type ProductMode,
+} from "@/components/order-product-fields"
+import { OptionalSection } from "@/components/optional-section"
 import { SearchPicker } from "@/components/search-picker"
 import { FieldError, RequiredMark } from "@/components/field-error"
 import { UpgradeLink } from "@/components/upgrade-link"
 import { focusFirstError } from "@/lib/form-errors"
-import { canUseGemini, canUseSecondCurrency, fetchProfile } from "@/lib/profile"
+import {
+  aiReadsLeft,
+  canUseSecondCurrency,
+  fetchAiQuota,
+  fetchProfile,
+  type AiQuota,
+} from "@/lib/profile"
 import { type Currency } from "../../lib/local-orders"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
@@ -35,6 +46,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -46,7 +66,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 
-import { resizeImageToDataUrl } from "../../lib/image-resize"
+import { photoSizeFor, resizeImageToDataUrl } from "../../lib/image-resize"
 import { readOrderWithOcr } from "../../lib/screenshot-ocr"
 import {
   buildCustomerSummaries,
@@ -130,26 +150,56 @@ function readFileAsDataUrl(file: File) {
   })
 }
 
-async function readOrderWithGemini(file: File): Promise<ExtractedOrder> {
+// The server refused because the Free monthly limit is used up.
+class AiLimitError extends Error {
+  quota: AiQuota
+
+  constructor(quota: AiQuota) {
+    super(translate("You have used all your free AI reads this month"))
+    this.quota = quota
+  }
+}
+
+// A busy or unreachable Gemini. Worth one quiet retry.
+class AiBusyError extends Error {}
+
+async function readOrderWithGemini(
+  file: File
+): Promise<{ data: ExtractedOrder; quota?: AiQuota }> {
   // A chat screenshot needs more detail than a product thumbnail.
   const image = await resizeImageToDataUrl(file, 1600, 0.8)
 
-  const response = await fetch("/api/extract-order", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image }),
-  })
+  let response: Response
+
+  try {
+    response = await fetch("/api/extract-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image }),
+    })
+  } catch {
+    throw new AiBusyError(translate("Could not reach the server. Check your connection"))
+  }
 
   const result = (await response.json().catch(() => null)) as {
     data?: ExtractedOrder
     error?: string
+    quota?: AiQuota
   } | null
 
-  if (!response.ok || !result?.data) {
-    throw new Error(translate(result?.error || "Gemini could not read this image"))
+  if (response.status === 429 && result?.quota) {
+    throw new AiLimitError(result.quota)
   }
 
-  return result.data
+  if (!response.ok || !result?.data) {
+    const message = translate(result?.error || "Gemini could not read this image")
+
+    throw response.status === 502 || response.status === 504
+      ? new AiBusyError(message)
+      : new Error(message)
+  }
+
+  return { data: result.data, quota: result.quota }
 }
 
 export default function CreateOrderPage() {
@@ -172,6 +222,7 @@ export default function CreateOrderPage() {
   const [phone, setPhone] = useState("")
   const [location, setLocation] = useState("")
   const [otherContacts, setOtherContacts] = useState("")
+  const [showMoreContacts, setShowMoreContacts] = useState(false)
 
   const [shops, setShops] = useState<LocalShop[]>([])
   const [shopMode, setShopMode] = useState<PickMode>("existing")
@@ -183,7 +234,6 @@ export default function CreateOrderPage() {
   const [productName, setProductName] = useState("")
   const [productSize, setProductSize] = useState("")
   const [productColor, setProductColor] = useState("")
-  const [productDescription, setProductDescription] = useState("")
   const [quantity, setQuantity] = useState("1")
   const [costPriceThb, setCostPriceThb] = useState("")
   const [sellingPriceThb, setSellingPriceThb] = useState("")
@@ -194,13 +244,32 @@ export default function CreateOrderPage() {
   const [amountPaidThb, setAmountPaidThb] = useState("")
 
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null)
+  const [saveScreenshot, setSaveScreenshot] = useState(false)
+  const [aiBusy, setAiBusy] = useState(false)
+  // A read that failed, kept so the user can try again without choosing the
+  // file again.
+  const [failedAi, setFailedAi] = useState<{
+    file: File
+    dataUrl: string
+    extractionId: number
+    tries: number
+  } | null>(null)
+  const [showMoreProduct, setShowMoreProduct] = useState(false)
+  const [showShopExtras, setShowShopExtras] = useState(false)
   const [screenshotPreview, setScreenshotPreview] = useState("")
   const [productMode, setProductMode] = useState<ProductMode>("existing")
   const [selectedProductId, setSelectedProductId] = useState("")
   const [productPhotoFile, setProductPhotoFile] = useState<File | null>(null)
   const [productPhotoPreview, setProductPhotoPreview] = useState("")
   const [readStatus, setReadStatus] = useState("")
-  const [useGemini, setUseGemini] = useState(false)
+  const [aiQuota, setAiQuota] = useState<AiQuota | null>(null)
+  // A screenshot waiting for the user to agree to the AI read.
+  const [pendingAi, setPendingAi] = useState<{
+    file: File
+    dataUrl: string
+    extractionId: number
+  } | null>(null)
+  const [isPro, setIsPro] = useState(false)
   const [baseCurrency, setBaseCurrency] = useState<Currency>("MMK")
   // Pro accounts with a second currency charge the customer in it. Everyone
   // else charges in the primary currency at a rate of 1.
@@ -235,16 +304,19 @@ export default function CreateOrderPage() {
       }
     }
 
-    // Plan and role come from the signed-in profile. The server checks them
-    // again before it calls Gemini.
+    // The plan and AI reads used come from the signed-in account. The server
+    // counts and limits the reads again before it calls Gemini.
     async function loadProfile() {
-      const profile = isSupabaseConfigured
-        ? await fetchProfile(createClient())
-        : null
+      const db = isSupabaseConfigured ? createClient() : null
+      const [profile, quota] = await Promise.all([
+        db ? fetchProfile(db) : null,
+        db ? fetchAiQuota(db) : null,
+      ])
 
       if (cancelled || !profile) return
 
-      setUseGemini(canUseGemini(profile))
+      setAiQuota(quota)
+      setIsPro(profile.plan === "pro")
       setBaseCurrency(profile.baseCurrency)
 
       if (canUseSecondCurrency(profile) && profile.secondaryCurrency) {
@@ -279,6 +351,11 @@ export default function CreateOrderPage() {
     })
   }
 
+  // AI is on when the account is known and has reads left.
+  const photo = photoSizeFor(isPro)
+  const useGemini = aiQuota !== null && aiReadsLeft(aiQuota) > 0
+  const aiExhausted = aiQuota !== null && !useGemini
+
   function chooseCustomerMode(mode: PickMode) {
     clearFieldError("customerPicker", "customerName")
     customerTouchedRef.current = true
@@ -298,10 +375,24 @@ export default function CreateOrderPage() {
     setLocation((value) => value || data.address)
     setOtherContacts((value) => value || data.otherContacts)
     setProductName((value) => value || data.productName)
-    setProductDescription((value) => value || data.productDescription)
     setProductSize((value) => value || data.productSize)
     setProductColor((value) => value || data.productColor)
-    setCustomerMessage((value) => value || data.customerMessage)
+    if (data.productColor || data.customerMessage || data.productDescription) {
+      setShowMoreProduct(true)
+    }
+    setCustomerMessage(
+      (value) =>
+        value ||
+        [data.customerMessage, data.productDescription].filter(Boolean).join("\n")
+    )
+    if (data.facebookName || data.otherContacts) {
+      if (
+        (data.facebookName && data.facebookName !== data.customerName) ||
+        data.otherContacts
+      ) {
+        setShowMoreContacts(true)
+      }
+    }
     if (data.quantity > 1) setQuantity(String(data.quantity))
     setSellingPriceThb(
       (value) =>
@@ -334,6 +425,9 @@ export default function CreateOrderPage() {
     setScreenshotFile(file)
     setScreenshotPreview("")
     setReadStatus("")
+    setPendingAi(null)
+    setFailedAi(null)
+    setSaveScreenshot(false)
 
     if (!file) return
 
@@ -357,66 +451,155 @@ export default function CreateOrderPage() {
 
     setScreenshotPreview(screenshotDataUrl)
 
-    // Managers on the Pro plan use Gemini. Everyone else reads on the device.
-    const withGemini = useGemini
+    // With AI reads left, ask before anything leaves the device. Otherwise the
+    // screenshot is read on this device.
+    if (useGemini) {
+      setPendingAi({ file, dataUrl: screenshotDataUrl, extractionId })
+      return
+    }
+
+    await readOnDevice(file, screenshotDataUrl, extractionId, aiExhausted)
+  }
+
+  function showResult(
+    data: ExtractedOrder,
+    extractionId: number,
+    withGemini: boolean
+  ) {
+    if (extractionIdRef.current !== extractionId) return
+
+    const matchMessage = applyExtraction(data)
 
     setReadStatus(
-      withGemini
-        ? t("Reading the screenshot with Gemini...")
-        : t("Reading the screenshot on this device...")
+      [
+        withGemini ? t("Details filled by Gemini") : t("Details filled"),
+        matchMessage,
+        t("Please review before saving"),
+      ]
+        .filter(Boolean)
+        .join(" ")
     )
+  }
+
+  function showReadError(caught: unknown, extractionId: number) {
+    if (extractionIdRef.current !== extractionId) return
+
+    setReadStatus(
+      `${t(caught instanceof Error ? caught.message : "Could not read this screenshot")} ${t("You can fill the fields manually")}`
+    )
+  }
+
+  async function readOnDevice(
+    file: File,
+    screenshotDataUrl: string,
+    extractionId: number,
+    limitReached = false
+  ) {
+    setReadStatus(t("Reading the screenshot on this device..."))
 
     try {
-      let data: ExtractedOrder
+      const ocr = await readOrderWithOcr(file, screenshotDataUrl, (message) => {
+        if (extractionIdRef.current === extractionId) setReadStatus(message)
+      })
 
-      if (withGemini) {
-        data = await readOrderWithGemini(file)
-      } else {
-        const ocr = await readOrderWithOcr(file, screenshotDataUrl, (message) => {
-          if (extractionIdRef.current === extractionId) setReadStatus(message)
-        })
-
-        data = {
-          customerName: ocr.customerName,
-          facebookName: ocr.customerName,
-          phone: "",
-          address: "",
-          otherContacts: "",
-          productName: "",
-          productDescription: [
-            ocr.productColor && `Color: ${ocr.productColor}`,
-            ocr.productSize && `Size: ${ocr.productSize}`,
-          ]
-            .filter(Boolean)
-            .join("\n"),
-          productSize: ocr.productSize,
-          productColor: ocr.productColor,
-          quantity: 1,
-          sellingPriceThb: 0,
-          customerMessage: ocr.customerMessage,
-        }
+      const data: ExtractedOrder = {
+        customerName: ocr.customerName,
+        facebookName: ocr.customerName,
+        phone: "",
+        address: "",
+        otherContacts: "",
+        productName: "",
+        productDescription: "",
+        productSize: ocr.productSize,
+        productColor: ocr.productColor,
+        quantity: 1,
+        sellingPriceThb: 0,
+        customerMessage: ocr.customerMessage,
       }
 
-      if (extractionIdRef.current !== extractionId) return
+      showResult(data, extractionId, false)
 
-      const matchMessage = applyExtraction(data)
-
-      setReadStatus(
-        [
-          withGemini ? t("Details filled by Gemini") : t("Details filled"),
-          matchMessage,
-          t("Please review before saving"),
-        ]
-          .filter(Boolean)
-          .join(" ")
-      )
+      if (limitReached && extractionIdRef.current === extractionId) {
+        setReadStatus((status) =>
+          `${status} ${t("You have used all your free AI reads this month")}`.trim()
+        )
+      }
     } catch (caught) {
-      if (extractionIdRef.current !== extractionId) return
-
-      setReadStatus(
-        `${t(caught instanceof Error ? caught.message : "Could not read this screenshot")} ${t("You can fill the fields manually")}`
-      )
+      showReadError(caught, extractionId)
     }
+  }
+
+  // The user agreed: send the screenshot to Gemini. A busy Gemini is retried
+  // once on its own; after that the user can try again by hand. The server
+  // gives back a failed read, so trying again costs nothing.
+  async function readWithAi(
+    target:
+      | { file: File; dataUrl: string; extractionId: number }
+      | null = pendingAi,
+    tries = 1
+  ) {
+    if (!target || aiBusy) return
+
+    const { file, dataUrl, extractionId } = target
+
+    setPendingAi(null)
+    setFailedAi(null)
+    setAiBusy(true)
+    setReadStatus(t("Reading the screenshot with Gemini..."))
+
+    try {
+      let result: Awaited<ReturnType<typeof readOrderWithGemini>>
+
+      try {
+        result = await readOrderWithGemini(file)
+      } catch (caught) {
+        if (!(caught instanceof AiBusyError)) throw caught
+
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+
+        if (extractionIdRef.current !== extractionId) return
+
+        result = await readOrderWithGemini(file)
+      }
+
+      if (result.quota) setAiQuota(result.quota)
+
+      showResult(result.data, extractionId, true)
+    } catch (caught) {
+      if (caught instanceof AiLimitError) {
+        // Used up elsewhere (another tab). Read on this device instead.
+        setAiQuota(caught.quota)
+        await readOnDevice(file, dataUrl, extractionId, true)
+        return
+      }
+
+      if (extractionIdRef.current === extractionId) {
+        setFailedAi({ file, dataUrl, extractionId, tries })
+        showReadError(caught, extractionId)
+      }
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
+  // After a failed read: stop trying and read on this device instead.
+  async function readFailedOnDevice() {
+    if (!failedAi) return
+
+    const { file, dataUrl, extractionId } = failedAi
+
+    setFailedAi(null)
+    await readOnDevice(file, dataUrl, extractionId)
+  }
+
+  // The user declined: nothing is sent, the screenshot is read on this device.
+  async function declineAi() {
+    if (!pendingAi) return
+
+    const { file, dataUrl, extractionId } = pendingAi
+
+    setPendingAi(null)
+    await readOnDevice(file, dataUrl, extractionId)
   }
 
   async function handleProductPhotoChange(
@@ -480,7 +663,6 @@ export default function CreateOrderPage() {
 
     const trimmedSize = productSize.trim()
     const trimmedColor = productColor.trim()
-    const trimmedDescription = productDescription.trim()
     const trimmedProductName = productName.trim()
     const quantityNumber = Number(quantity.trim())
     const costPriceNumber = toNumber(costPriceThb)
@@ -614,16 +796,20 @@ export default function CreateOrderPage() {
       // Photos go to Supabase Storage. Both are optional. A new product's
       // photo is also saved for the shop product, so deleting the order never
       // removes the shop's photo.
-      if (screenshotFile) {
+      if (screenshotFile && saveScreenshot) {
         orderScreenshotPath = await uploadPhoto(
-          await resizeImageToDataUrl(screenshotFile, 1600, 0.8),
+          await resizeImageToDataUrl(screenshotFile, photo.maxSide, photo.quality),
           "orders"
         )
         uploadedPaths.push(orderScreenshotPath)
       }
 
       if (productPhotoFile) {
-        const resized = await resizeImageToDataUrl(productPhotoFile, 1600, 0.8)
+        const resized = await resizeImageToDataUrl(
+          productPhotoFile,
+          photo.maxSide,
+          photo.quality
+        )
 
         productPhotoPath = await uploadPhoto(resized, "orders")
         uploadedPaths.push(productPhotoPath)
@@ -671,14 +857,13 @@ export default function CreateOrderPage() {
 
         sourceType: "customer_chat",
         customerMessageBurmese: customerMessage.trim(),
-        productName:
-          trimmedProductName || trimmedDescription || "Product photo order",
+        productName: trimmedProductName,
         productOption: trimmedSize,
         quantity: quantityNumber,
         productSize: trimmedSize,
         productColor: trimmedColor,
-        productDescription: trimmedDescription,
-        productNote: trimmedDescription,
+        productDescription: "",
+        productNote: "",
         retailerName: shopName,
         retailerUnitPriceThb: costPriceNumber,
         sellingUnitPriceThb: sellingPriceNumber,
@@ -763,11 +948,6 @@ export default function CreateOrderPage() {
             <CardTitle className="flex items-center gap-2 text-lg">
               <IconCamera className="size-5 text-muted-foreground" />{t("Chat Screenshot")}
             </CardTitle>
-            <CardDescription>
-              {useGemini
-                ? t("Optional. Upload the Messenger screenshot. Gemini reads the customer, product and message details and fills the form")
-                : t("Optional. Upload the Messenger screenshot. The customer and product details are read on this device where possible")}
-            </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -778,9 +958,22 @@ export default function CreateOrderPage() {
               className="rounded-xl"
               onChange={handleScreenshotChange}
             />
-            <p className="text-xs text-muted-foreground">
-              <RichText text={t("Photos are deleted 7 days after you save the order. Pro accounts can keep them for 3 months from the order page. To upgrade, contact {email}")} parts={{ email: <UpgradeLink /> }} />
-            </p>
+            {aiQuota ? (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <IconSparkles className="size-3.5 shrink-0" />
+                {aiQuota.max === null
+                  ? t("AI reads used this month: {used}", { used: aiQuota.used })
+                  : t("AI reads left this month: {left} of {max}", {
+                      left: aiReadsLeft(aiQuota),
+                      max: aiQuota.max,
+                    })}
+              </p>
+            ) : null}
+            {aiExhausted && !isPro ? (
+              <p className="text-xs text-muted-foreground">
+                <RichText text={t("Free accounts get {max} AI reads a month. Your reads come back next month. To upgrade to Pro for unlimited reads, contact {email}", { max: aiQuota?.max ?? 0 })} parts={{ email: <UpgradeLink /> }} />
+              </p>
+            ) : null}
 
             {screenshotPreview ? (
               <div className="space-y-3">
@@ -796,10 +989,68 @@ export default function CreateOrderPage() {
                 </div>
 
                 {readStatus ? (
-                  <div className="flex items-start gap-2 rounded-xl border bg-background px-3 py-2 text-sm text-muted-foreground">
-                    <IconSparkles className="mt-0.5 size-4 shrink-0" />
-                    <span>{readStatus}</span>
+                  <div className="space-y-3 rounded-xl border bg-background px-3 py-2 text-sm text-muted-foreground">
+                    <div className="flex items-start gap-2">
+                      <IconSparkles className="mt-0.5 size-4 shrink-0" />
+                      <span>{readStatus}</span>
+                    </div>
+                    {failedAi ? (
+                      <div className="flex flex-wrap gap-2">
+                        {failedAi.tries < 3 ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="rounded-xl"
+                            disabled={aiBusy}
+                            onClick={() =>
+                              void readWithAi(failedAi, failedAi.tries + 1)
+                            }
+                          >
+                            {t("Try again")}
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="rounded-xl"
+                          disabled={aiBusy}
+                          onClick={() => void readFailedOnDevice()}
+                        >
+                          {t("Read on this device")}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="rounded-xl"
+                          onClick={() => {
+                            setFailedAi(null)
+                            setReadStatus("")
+                          }}
+                        >
+                          {t("Fill by hand")}
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
+                ) : null}
+
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={saveScreenshot}
+                    onCheckedChange={(checked) => setSaveScreenshot(checked === true)}
+                  />
+                  {t("Save this screenshot with the order")}
+                </label>
+                {saveScreenshot ? (
+                  <p className="text-xs text-muted-foreground">
+                    {t(
+                      isPro
+                        ? "Photos are kept for 6 months after they are saved"
+                        : "Photos are kept for 90 days after they are saved"
+                    )}
+                  </p>
                 ) : null}
               </div>
             ) : null}
@@ -877,13 +1128,6 @@ export default function CreateOrderPage() {
                   placeholder={t("Customer name")}
                 />
                 <TextField
-                  id="facebookName"
-                  label={t("Facebook name")}
-                  value={facebookName}
-                  onChange={setFacebookName}
-                  placeholder={t("Facebook display name")}
-                />
-                <TextField
                   id="phone"
                   label={t("Phone number")}
                   value={phone}
@@ -901,17 +1145,31 @@ export default function CreateOrderPage() {
                     className="min-h-24 rounded-xl text-base"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="otherContacts">{t("Other contacts")}</Label>
-                  <Textarea
-                    id="otherContacts"
-                    value={otherContacts}
-                    onChange={(event) => setOtherContacts(event.target.value)}
-                    placeholder={t("Viber, Telegram, second phone")}
-                    className="min-h-20 rounded-xl text-base"
+                <OptionalSection
+                  label={t("Facebook or other contacts")}
+                  open={showMoreContacts}
+                  onOpenChange={setShowMoreContacts}
+                  hasValue={!!(facebookName.trim() || otherContacts.trim())}
+                >
+                  <TextField
+                    id="facebookName"
+                    label={t("Facebook name")}
+                    value={facebookName}
+                    onChange={setFacebookName}
+                    placeholder={t("Facebook display name")}
                   />
-                </div>
-                <p className="text-xs text-muted-foreground">{t("The customer is saved to your customer list with this order")}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="otherContacts">{t("Other contacts")}</Label>
+                    <Textarea
+                      id="otherContacts"
+                      value={otherContacts}
+                      onChange={(event) => setOtherContacts(event.target.value)}
+                      placeholder={t("Viber, Telegram, second phone")}
+                      className="min-h-20 rounded-xl text-base"
+                    />
+                  </div>
+                </OptionalSection>
+                <p className="text-xs text-muted-foreground">{t("The customer is saved to your customer list with this order. Add more details later in Data")}</p>
               </div>
             )}
           </CardContent>
@@ -971,24 +1229,31 @@ export default function CreateOrderPage() {
               error={fieldErrors.newShopName}
                   placeholder={t("Bangkok shop")}
                 />
-                <TextField
-                  id="newShopPhone"
-                  label={t("Phone or LINE (optional)")}
-                  value={newShopPhone}
-                  onChange={setNewShopPhone}
-                  placeholder={t("Phone number or LINE ID")}
-                />
-                <div className="space-y-2">
-                  <Label htmlFor="newShopLocation">{t("Location (optional)")}</Label>
-                  <Textarea
-                    id="newShopLocation"
-                    value={newShopLocation}
-                    onChange={(event) => setNewShopLocation(event.target.value)}
-                    placeholder={t("Shop address, mall, or market")}
-                    className="min-h-20 rounded-xl text-base"
+                <OptionalSection
+                  label={t("Phone, LINE or location")}
+                  open={showShopExtras}
+                  onOpenChange={setShowShopExtras}
+                  hasValue={!!(newShopPhone.trim() || newShopLocation.trim())}
+                >
+                  <TextField
+                    id="newShopPhone"
+                    label={t("Phone or LINE (optional)")}
+                    value={newShopPhone}
+                    onChange={setNewShopPhone}
+                    placeholder={t("Phone number or LINE ID")}
                   />
-                </div>
-                <p className="text-xs text-muted-foreground">{t("The shop is saved to your shop list with this order")}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="newShopLocation">{t("Location (optional)")}</Label>
+                    <Textarea
+                      id="newShopLocation"
+                      value={newShopLocation}
+                      onChange={(event) => setNewShopLocation(event.target.value)}
+                      placeholder={t("Shop address, mall, or market")}
+                      className="min-h-20 rounded-xl text-base"
+                    />
+                  </div>
+                </OptionalSection>
+                <p className="text-xs text-muted-foreground">{t("The shop is saved to your shop list with this order. You can add more details later in Data")}</p>
               </div>
             )}
           </CardContent>
@@ -998,7 +1263,7 @@ export default function CreateOrderPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <IconMessage2 className="size-5 text-muted-foreground" />{t("Product Info")}</CardTitle>
-            <CardDescription>{t("Record description, size, and color from the customer chat")}</CardDescription>
+            <CardDescription>{t("Product, price and customer note")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -1012,9 +1277,6 @@ export default function CreateOrderPage() {
               onModeChange={setProductMode}
               productId={selectedProductId}
               onPickProduct={pickProduct}
-              photoPreview={productPhotoPreview}
-              onPhotoChange={handleProductPhotoChange}
-              photoLabel={t("Product photo (optional)")}
             />
 
             <TextField
@@ -1030,38 +1292,18 @@ export default function CreateOrderPage() {
               placeholder={t("Nike Air Force 1, dress, bag...")}
             />
 
-            <div className="space-y-2">
-              <Label htmlFor="productDescription">{t("Description")}</Label>
-              <Textarea
-                id="productDescription"
-                value={productDescription}
-                onChange={(event) => setProductDescription(event.target.value)}
-                placeholder={t("Dress, bag, shoes, or product note")}
-                className="min-h-24 rounded-xl text-base"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <TextField
-                id="productSize"
-                label={t("Size / variant")}
-                value={productSize}
-                onChange={(value) => {
-                setProductSize(value)
-                clearFieldError("productSize")
-              }}
-              required
-              error={fieldErrors.productSize}
-                placeholder={t("XS, 42, L...")}
-              />
-              <TextField
-                id="productColor"
-                label={t("Color")}
-                value={productColor}
-                onChange={setProductColor}
-                placeholder={t("White, black...")}
-              />
-            </div>
+            <TextField
+              id="productSize"
+              label={t("Size / variant")}
+              value={productSize}
+              onChange={(value) => {
+              setProductSize(value)
+              clearFieldError("productSize")
+            }}
+            required
+            error={fieldErrors.productSize}
+              placeholder={t("XS, 42, L...")}
+            />
 
             <div className="grid grid-cols-2 gap-3">
               <TextField
@@ -1129,6 +1371,19 @@ export default function CreateOrderPage() {
               />
             ) : null}
 
+            <OptionalSection
+              label={t("Color, note or photo")}
+              open={showMoreProduct}
+              onOpenChange={setShowMoreProduct}
+              hasValue={!!(productColor.trim() || customerMessage.trim() || productPhotoFile)}
+            >
+            <TextField
+              id="productColor"
+              label={t("Color")}
+              value={productColor}
+              onChange={setProductColor}
+              placeholder={t("White, black...")}
+            />
             <div className="space-y-2">
               <Label htmlFor="customerMessage">{t("Customer note")}</Label>
               <Textarea
@@ -1139,6 +1394,17 @@ export default function CreateOrderPage() {
                 className="min-h-24 rounded-xl text-base"
               />
             </div>
+              <ProductPhotoField
+                preview={productPhotoPreview}
+                onChange={handleProductPhotoChange}
+                label={t("Product photo (optional)")}
+                hint={t(
+                  isPro
+                    ? "Photos are kept for 6 months after they are saved"
+                    : "Photos are kept for 90 days after they are saved"
+                )}
+              />
+            </OptionalSection>
           </CardContent>
         </Card>
 
@@ -1228,6 +1494,42 @@ export default function CreateOrderPage() {
           </div>
         </div>
       </form>
+
+      <Dialog
+        open={pendingAi !== null}
+        onOpenChange={(open) => {
+          if (!open) void declineAi()
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconSparkles className="size-5" />
+              {t("Use AI to read your screenshot?")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("We will send this screenshot to Google Gemini. It reads the customer, product and message details and fills the form for you. Please check the details before saving")}
+            </DialogDescription>
+          </DialogHeader>
+          {aiQuota ? (
+            <p className="text-sm text-muted-foreground">
+              {aiQuota.max === null
+                ? t("AI reads used this month: {used}", { used: aiQuota.used })
+                : t("This uses 1 of your {left} AI reads left this month", {
+                    left: aiReadsLeft(aiQuota),
+                  })}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => void declineAi()}>
+              {t("No thanks, read on this device")}
+            </Button>
+            <Button type="button" onClick={() => void readWithAi()}>
+              {t("Agree and fill with AI")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }

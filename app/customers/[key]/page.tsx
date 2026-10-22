@@ -485,7 +485,7 @@ export default function CustomerDetailsPage() {
         </DialogContent>
       </Dialog>
 
-      <BottomNavigation active="customers" />
+      <BottomNavigation active="data" />
     </main>
   )
 }

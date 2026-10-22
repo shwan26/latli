@@ -27,9 +27,9 @@ const ROWS: { label: string; free: Cell; pro: Cell }[] = [
   { label: "Sales, cost, and profit dashboard", free: true, pro: true },
   { label: "Order screenshots read on your device", free: true, pro: true },
   { label: "Currencies", free: "1 currency", pro: "2 with exchange rate" },
-  { label: "Order screenshots read with Gemini", free: false, pro: "Owners" },
+  { label: "Order screenshots read with Gemini", free: "10 per month", pro: "Unlimited" },
   { label: "Advanced charts", free: false, pro: true },
-  { label: "Product photos kept for", free: "7 days", pro: "Up to 3 months" },
+  { label: "Product photos kept for", free: "90 days", pro: "6 months" },
   { label: "Stored photos (5 MB each)", free: "30 photos", pro: "150 photos" },
 ]
 

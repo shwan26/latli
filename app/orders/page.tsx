@@ -241,12 +241,6 @@ function OrdersContent() {
             </p>
             <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Orders")}</h1>
           </div>
-
-          <Button asChild size="icon" className="size-11 rounded-xl">
-            <Link href="/orders/create" aria-label={t("Add order")}>
-              <IconPlus className="size-5" />
-            </Link>
-          </Button>
         </div>
       </header>
 

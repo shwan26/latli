@@ -40,9 +40,9 @@ function buildSections(t: T): LegalSection[] {
     body: [
       t("Latli has a Free plan and a Pro plan. Plans differ in the features they include, such as how long photos are kept and whether screenshots can be read with AI."),
       [
-        t("Free: photos are deleted 7 days after they are saved."),
-        t("Pro: photos are also deleted after 7 days unless you choose Keep photos for 3 months. That keeps them for 3 months from the day you press it, and you can press it again later to extend them."),
-        t("Pro: managers can have order screenshots read with Gemini (see section 7)."),
+        t("Free: photos are deleted 90 days after they are saved."),
+        t("Pro: photos are deleted 6 months after they are saved. If your Pro plan ends, photos that would last longer are deleted 90 days after it ends."),
+        t("AI reading: every account can have order screenshots read with Gemini (see section 7). Free accounts can do this 10 times a month; Pro accounts are not limited."),
       ],
       t("Plans, features and any price may change. We will tell you before a change that makes your plan worse. Your plan is set on your account by us, and you cannot change it yourself."),
       t("To upgrade to Pro, or to raise a support ticket, contact {contactEmail}.", { contactEmail: LEGAL.contactEmail }),
@@ -67,7 +67,7 @@ function buildSections(t: T): LegalSection[] {
   {
     heading: t("Reading screenshots with AI"),
     body: [
-      t("On the Pro plan, owners can upload a chat screenshot and have Latli read it with Google's Gemini service to fill in an order. Other accounts read screenshots on their own device."),
+      t("You can upload a chat screenshot and, if you agree when asked, have Latli read it with Google's Gemini service to fill in an order. If you do not agree, the screenshot is read on your own device."),
       t("AI can make mistakes: it may misread names, phone numbers, sizes or prices, or leave things out. Always check what was filled in before you save an order. You are responsible for the orders you save."),
       t("Do not upload a screenshot unless you are allowed to share what it shows with a service provider."),
     ],
