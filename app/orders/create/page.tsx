@@ -22,7 +22,13 @@ import { SearchPicker } from "@/components/search-picker"
 import { FieldError, RequiredMark } from "@/components/field-error"
 import { UpgradeLink } from "@/components/upgrade-link"
 import { focusFirstError } from "@/lib/form-errors"
-import { canUseGemini, canUseSecondCurrency, fetchProfile } from "@/lib/profile"
+import {
+  aiReadsLeft,
+  canUseSecondCurrency,
+  fetchAiQuota,
+  fetchProfile,
+  type AiQuota,
+} from "@/lib/profile"
 import { type Currency } from "../../lib/local-orders"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
@@ -35,6 +41,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -130,7 +144,19 @@ function readFileAsDataUrl(file: File) {
   })
 }
 
-async function readOrderWithGemini(file: File): Promise<ExtractedOrder> {
+// The server refused because the Free monthly limit is used up.
+class AiLimitError extends Error {
+  quota: AiQuota
+
+  constructor(quota: AiQuota) {
+    super(translate("You have used all your free AI reads this month"))
+    this.quota = quota
+  }
+}
+
+async function readOrderWithGemini(
+  file: File
+): Promise<{ data: ExtractedOrder; quota?: AiQuota }> {
   // A chat screenshot needs more detail than a product thumbnail.
   const image = await resizeImageToDataUrl(file, 1600, 0.8)
 
@@ -143,13 +169,18 @@ async function readOrderWithGemini(file: File): Promise<ExtractedOrder> {
   const result = (await response.json().catch(() => null)) as {
     data?: ExtractedOrder
     error?: string
+    quota?: AiQuota
   } | null
+
+  if (response.status === 429 && result?.quota) {
+    throw new AiLimitError(result.quota)
+  }
 
   if (!response.ok || !result?.data) {
     throw new Error(translate(result?.error || "Gemini could not read this image"))
   }
 
-  return result.data
+  return { data: result.data, quota: result.quota }
 }
 
 export default function CreateOrderPage() {
@@ -200,7 +231,14 @@ export default function CreateOrderPage() {
   const [productPhotoFile, setProductPhotoFile] = useState<File | null>(null)
   const [productPhotoPreview, setProductPhotoPreview] = useState("")
   const [readStatus, setReadStatus] = useState("")
-  const [useGemini, setUseGemini] = useState(false)
+  const [aiQuota, setAiQuota] = useState<AiQuota | null>(null)
+  // A screenshot waiting for the user to agree to the AI read.
+  const [pendingAi, setPendingAi] = useState<{
+    file: File
+    dataUrl: string
+    extractionId: number
+  } | null>(null)
+  const [isPro, setIsPro] = useState(false)
   const [baseCurrency, setBaseCurrency] = useState<Currency>("MMK")
   // Pro accounts with a second currency charge the customer in it. Everyone
   // else charges in the primary currency at a rate of 1.
@@ -235,16 +273,19 @@ export default function CreateOrderPage() {
       }
     }
 
-    // Plan and role come from the signed-in profile. The server checks them
-    // again before it calls Gemini.
+    // The plan and AI reads used come from the signed-in account. The server
+    // counts and limits the reads again before it calls Gemini.
     async function loadProfile() {
-      const profile = isSupabaseConfigured
-        ? await fetchProfile(createClient())
-        : null
+      const db = isSupabaseConfigured ? createClient() : null
+      const [profile, quota] = await Promise.all([
+        db ? fetchProfile(db) : null,
+        db ? fetchAiQuota(db) : null,
+      ])
 
       if (cancelled || !profile) return
 
-      setUseGemini(canUseGemini(profile))
+      setAiQuota(quota)
+      setIsPro(profile.plan === "pro")
       setBaseCurrency(profile.baseCurrency)
 
       if (canUseSecondCurrency(profile) && profile.secondaryCurrency) {
@@ -278,6 +319,10 @@ export default function CreateOrderPage() {
       return next
     })
   }
+
+  // AI is on when the account is known and has reads left.
+  const useGemini = aiQuota !== null && aiReadsLeft(aiQuota) > 0
+  const aiExhausted = aiQuota !== null && !useGemini
 
   function chooseCustomerMode(mode: PickMode) {
     clearFieldError("customerPicker", "customerName")
@@ -334,6 +379,7 @@ export default function CreateOrderPage() {
     setScreenshotFile(file)
     setScreenshotPreview("")
     setReadStatus("")
+    setPendingAi(null)
 
     if (!file) return
 
@@ -357,66 +403,124 @@ export default function CreateOrderPage() {
 
     setScreenshotPreview(screenshotDataUrl)
 
-    // Managers on the Pro plan use Gemini. Everyone else reads on the device.
-    const withGemini = useGemini
+    // With AI reads left, ask before anything leaves the device. Otherwise the
+    // screenshot is read on this device.
+    if (useGemini) {
+      setPendingAi({ file, dataUrl: screenshotDataUrl, extractionId })
+      return
+    }
+
+    await readOnDevice(file, screenshotDataUrl, extractionId, aiExhausted)
+  }
+
+  function showResult(
+    data: ExtractedOrder,
+    extractionId: number,
+    withGemini: boolean
+  ) {
+    if (extractionIdRef.current !== extractionId) return
+
+    const matchMessage = applyExtraction(data)
 
     setReadStatus(
-      withGemini
-        ? t("Reading the screenshot with Gemini...")
-        : t("Reading the screenshot on this device...")
+      [
+        withGemini ? t("Details filled by Gemini") : t("Details filled"),
+        matchMessage,
+        t("Please review before saving"),
+      ]
+        .filter(Boolean)
+        .join(" ")
     )
+  }
+
+  function showReadError(caught: unknown, extractionId: number) {
+    if (extractionIdRef.current !== extractionId) return
+
+    setReadStatus(
+      `${t(caught instanceof Error ? caught.message : "Could not read this screenshot")} ${t("You can fill the fields manually")}`
+    )
+  }
+
+  async function readOnDevice(
+    file: File,
+    screenshotDataUrl: string,
+    extractionId: number,
+    limitReached = false
+  ) {
+    setReadStatus(t("Reading the screenshot on this device..."))
 
     try {
-      let data: ExtractedOrder
+      const ocr = await readOrderWithOcr(file, screenshotDataUrl, (message) => {
+        if (extractionIdRef.current === extractionId) setReadStatus(message)
+      })
 
-      if (withGemini) {
-        data = await readOrderWithGemini(file)
-      } else {
-        const ocr = await readOrderWithOcr(file, screenshotDataUrl, (message) => {
-          if (extractionIdRef.current === extractionId) setReadStatus(message)
-        })
-
-        data = {
-          customerName: ocr.customerName,
-          facebookName: ocr.customerName,
-          phone: "",
-          address: "",
-          otherContacts: "",
-          productName: "",
-          productDescription: [
-            ocr.productColor && `Color: ${ocr.productColor}`,
-            ocr.productSize && `Size: ${ocr.productSize}`,
-          ]
-            .filter(Boolean)
-            .join("\n"),
-          productSize: ocr.productSize,
-          productColor: ocr.productColor,
-          quantity: 1,
-          sellingPriceThb: 0,
-          customerMessage: ocr.customerMessage,
-        }
-      }
-
-      if (extractionIdRef.current !== extractionId) return
-
-      const matchMessage = applyExtraction(data)
-
-      setReadStatus(
-        [
-          withGemini ? t("Details filled by Gemini") : t("Details filled"),
-          matchMessage,
-          t("Please review before saving"),
+      const data: ExtractedOrder = {
+        customerName: ocr.customerName,
+        facebookName: ocr.customerName,
+        phone: "",
+        address: "",
+        otherContacts: "",
+        productName: "",
+        productDescription: [
+          ocr.productColor && `Color: ${ocr.productColor}`,
+          ocr.productSize && `Size: ${ocr.productSize}`,
         ]
           .filter(Boolean)
-          .join(" ")
-      )
-    } catch (caught) {
-      if (extractionIdRef.current !== extractionId) return
+          .join("\n"),
+        productSize: ocr.productSize,
+        productColor: ocr.productColor,
+        quantity: 1,
+        sellingPriceThb: 0,
+        customerMessage: ocr.customerMessage,
+      }
 
-      setReadStatus(
-        `${t(caught instanceof Error ? caught.message : "Could not read this screenshot")} ${t("You can fill the fields manually")}`
-      )
+      showResult(data, extractionId, false)
+
+      if (limitReached && extractionIdRef.current === extractionId) {
+        setReadStatus((status) =>
+          `${status} ${t("You have used all your free AI reads this month")}`.trim()
+        )
+      }
+    } catch (caught) {
+      showReadError(caught, extractionId)
     }
+  }
+
+  // The user agreed: send the screenshot to Gemini.
+  async function readWithAi() {
+    if (!pendingAi) return
+
+    const { file, dataUrl, extractionId } = pendingAi
+
+    setPendingAi(null)
+    setReadStatus(t("Reading the screenshot with Gemini..."))
+
+    try {
+      const { data, quota } = await readOrderWithGemini(file)
+
+      if (quota) setAiQuota(quota)
+
+      showResult(data, extractionId, true)
+    } catch (caught) {
+      if (caught instanceof AiLimitError) {
+        // Used up elsewhere (another tab). Read on this device instead.
+        setAiQuota(caught.quota)
+        await readOnDevice(file, dataUrl, extractionId, true)
+        return
+      }
+
+      showReadError(caught, extractionId)
+    }
+  }
+
+  // The user declined: nothing is sent, the screenshot is read on this device.
+  async function declineAi() {
+    if (!pendingAi) return
+
+    const { file, dataUrl, extractionId } = pendingAi
+
+    setPendingAi(null)
+    await readOnDevice(file, dataUrl, extractionId)
   }
 
   async function handleProductPhotoChange(
@@ -765,7 +869,7 @@ export default function CreateOrderPage() {
             </CardTitle>
             <CardDescription>
               {useGemini
-                ? t("Optional. Upload the Messenger screenshot. Gemini reads the customer, product and message details and fills the form")
+                ? t("Optional. Upload the Messenger screenshot. With your OK, Gemini reads the customer, product and message details and fills the form")
                 : t("Optional. Upload the Messenger screenshot. The customer and product details are read on this device where possible")}
             </CardDescription>
           </CardHeader>
@@ -778,6 +882,22 @@ export default function CreateOrderPage() {
               className="rounded-xl"
               onChange={handleScreenshotChange}
             />
+            {aiQuota ? (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <IconSparkles className="size-3.5 shrink-0" />
+                {aiQuota.max === null
+                  ? t("AI reads used this month: {used}", { used: aiQuota.used })
+                  : t("AI reads left this month: {left} of {max}", {
+                      left: aiReadsLeft(aiQuota),
+                      max: aiQuota.max,
+                    })}
+              </p>
+            ) : null}
+            {aiExhausted && !isPro ? (
+              <p className="text-xs text-muted-foreground">
+                <RichText text={t("Free accounts get {max} AI reads a month. Your reads come back next month. To upgrade to Pro for unlimited reads, contact {email}", { max: aiQuota?.max ?? 0 })} parts={{ email: <UpgradeLink /> }} />
+              </p>
+            ) : null}
             <p className="text-xs text-muted-foreground">
               <RichText text={t("Photos are deleted 7 days after you save the order. Pro accounts can keep them for 3 months from the order page. To upgrade, contact {email}")} parts={{ email: <UpgradeLink /> }} />
             </p>
@@ -1228,6 +1348,42 @@ export default function CreateOrderPage() {
           </div>
         </div>
       </form>
+
+      <Dialog
+        open={pendingAi !== null}
+        onOpenChange={(open) => {
+          if (!open) void declineAi()
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconSparkles className="size-5" />
+              {t("Use AI to read your screenshot?")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("We will send this screenshot to Google Gemini. It reads the customer, product and message details and fills the form for you. Please check the details before saving")}
+            </DialogDescription>
+          </DialogHeader>
+          {aiQuota ? (
+            <p className="text-sm text-muted-foreground">
+              {aiQuota.max === null
+                ? t("AI reads used this month: {used}", { used: aiQuota.used })
+                : t("This uses 1 of your {left} AI reads left this month", {
+                    left: aiReadsLeft(aiQuota),
+                  })}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => void declineAi()}>
+              {t("No thanks, read on this device")}
+            </Button>
+            <Button type="button" onClick={() => void readWithAi()}>
+              {t("Agree and fill with AI")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }

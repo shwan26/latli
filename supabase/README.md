@@ -34,7 +34,10 @@ Follow the steps in order. It takes about 10 minutes.
 
 4. Restart `pnpm dev` after changing this file.
 
-- `GEMINI_API_KEY` is only used for managers on the Pro plan.
+- `GEMINI_API_KEY` reads order screenshots for every account. Free accounts get 10 reads a month, Pro accounts are not limited.
+  Optional: `GEMINI_MODEL` (default `gemini-3.1-flash-lite`) and
+  `GEMINI_FALLBACK_MODELS` (default `gemini-2.5-flash-lite,gemini-3-flash`). When
+  a model is busy (429/5xx) or does not answer, the next one is tried.
 - `SUPABASE_SERVICE_ROLE_KEY` is under **Project Settings > API > service_role**.
   It bypasses all security rules, so keep it on the server only. The app uses it
   for the photo clean-up route (step 6) and the Clear all data / Delete account routes (`app/api/account`). Never prefix it with
@@ -44,7 +47,7 @@ Follow the steps in order. It takes about 10 minutes.
 
 ## 3. Create the tables
 
-Open **SQL Editor > New query**. Run these eight files **in this order**, one
+Open **SQL Editor > New query**. Run these ten files **in this order**, one
 after the other (paste the whole file, then press Run):
 
 1. `supabase/migrations/20261003000000_profiles.sql`
@@ -91,6 +94,10 @@ after the other (paste the whole file, then press Run):
 
 9. `supabase/migrations/20261016000000_photo_keep_3_months.sql`
    Pro accounts can keep photos for 3 months instead of 30 days.
+
+10. `supabase/migrations/20261022000000_ai_usage.sql`
+    Counts AI screenshot reads per month (`ai_usage`). Free accounts are
+    limited to 10 a month; Pro accounts are counted but not limited.
 
 Each file should end with "Success. No rows returned". Run each file only once.
 If one fails halfway, tell me the error message instead of running it again.
@@ -186,10 +193,10 @@ In the app:
 4. Register a second account in a private window. It must not see the first
    account's data.
 
-## 7. Give someone Gemini or Pro access
+## 7. Give someone Pro access
 
-New accounts are `free` / `owner`. To let a manager read order screenshots with
-Gemini, run in the SQL Editor:
+New accounts are `free` / `owner`. Every account can read screenshots with
+Gemini (Free: 10 a month). To lift that limit, run in the SQL Editor:
 
 ```sql
 update public.profiles
@@ -199,7 +206,7 @@ where email = 'manager@example.com';
 
 - To show an end date on the More page, also set `plan_expires_at = '2026-12-31'`.
 - `plan = 'pro'` unlocks **Keep photos for 3 months**.
-- Gemini needs `plan = 'pro'` **and** `role = 'owner'`.
+- `plan = 'pro'` removes the 10 AI reads a month limit.
 
 Plan and role cannot be changed from the app, only here.
 

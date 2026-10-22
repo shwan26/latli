@@ -19,8 +19,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
+  aiReadsLeft,
   DEFAULT_PROFILE,
+  fetchAiQuota,
   fetchProfile,
+  type AiQuota,
   type ProfileSettings,
 } from "@/lib/profile"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
@@ -51,6 +54,7 @@ export default function SettingsPage() {
 
   const [mounted, setMounted] = useState(false)
   const [profile, setProfile] = useState<ProfileSettings>(DEFAULT_PROFILE)
+  const [aiQuota, setAiQuota] = useState<AiQuota | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -58,11 +62,15 @@ export default function SettingsPage() {
     async function load() {
       const db = isSupabaseConfigured ? createClient() : null
 
-      const loadedProfile = db ? await fetchProfile(db) : null
+      const [loadedProfile, quota] = await Promise.all([
+        db ? fetchProfile(db) : null,
+        db ? fetchAiQuota(db) : null,
+      ])
 
       if (cancelled) return
 
       if (loadedProfile) setProfile(loadedProfile)
+      setAiQuota(quota)
       setMounted(true)
     }
 
@@ -169,6 +177,19 @@ export default function SettingsPage() {
               <span className="text-sm font-medium">{t("Language")}</span>
               <LanguageSelect />
             </div>
+            {aiQuota ? (
+              <div className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border bg-background px-3 py-3">
+                <span className="text-sm font-medium">{t("AI reads this month")}</span>
+                <span className="text-sm text-muted-foreground">
+                  {aiQuota.max === null
+                    ? t("{used} used", { used: aiQuota.used })
+                    : t("{left} of {max} left", {
+                        left: aiReadsLeft(aiQuota),
+                        max: aiQuota.max,
+                      })}
+                </span>
+              </div>
+            ) : null}
             <CurrencySettings profile={profile} onSaved={setProfile} />
             <SettingsLink
               href="/profile"

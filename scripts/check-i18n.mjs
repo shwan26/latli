@@ -20,7 +20,8 @@ const EXTRA = [
   // messages from the server routes and the database
   "Supabase is not set up. See supabase/README.md",
   "Log in to read screenshots with Gemini",
-  "Gemini is available to managers on the Pro plan",
+  "You have used all your free AI reads this month",
+  "Could not check your AI reads. Try again",
   "Gemini is not set up. Add GEMINI_API_KEY to .env.local and restart the server",
   "The request was not valid",
   "Upload a JPG, PNG or WebP image under about 6 MB",
