@@ -1,7 +1,6 @@
 "use client"
 
 import Image from "next/image"
-import { IconCamera } from "@tabler/icons-react"
 
 import { SearchPicker } from "@/components/search-picker"
 import { Button } from "@/components/ui/button"
@@ -23,15 +22,18 @@ export function OrderProductFields({
   photoPreview,
   onPhotoChange,
   photoLabel,
+  photoHint,
 }: {
   products: LocalShopProduct[]
   mode: ProductMode
   onModeChange: (mode: ProductMode) => void
   productId: string
   onPickProduct: (product: LocalShopProduct) => void
-  photoPreview: string
-  onPhotoChange: (event: React.ChangeEvent<HTMLInputElement>) => void
-  photoLabel: string
+  // Leave these out to show no photo field (the new order form places it itself).
+  photoPreview?: string
+  onPhotoChange?: (event: React.ChangeEvent<HTMLInputElement>) => void
+  photoLabel?: string
+  photoHint?: string
 }) {
   const { t } = useI18n()
 
@@ -88,21 +90,50 @@ export function OrderProductFields({
         />
       ) : null}
 
+      {onPhotoChange ? (
+        <ProductPhotoField
+          preview={photoPreview ?? ""}
+          onChange={onPhotoChange}
+          label={photoLabel ?? ""}
+          hint={photoHint}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+// The optional product photo: file input, retention hint and preview.
+export function ProductPhotoField({
+  preview,
+  onChange,
+  label,
+  hint,
+}: {
+  preview: string
+  onChange: (event: React.ChangeEvent<HTMLInputElement>) => void
+  label: string
+  hint?: string
+}) {
+  const { t } = useI18n()
+
+  return (
+    <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="productPhoto">{photoLabel}</Label>
+        <Label htmlFor="productPhoto">{label}</Label>
         <Input
           id="productPhoto"
           type="file"
           accept="image/*"
           className="rounded-xl"
-          onChange={onPhotoChange}
+          onChange={onChange}
         />
+        {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       </div>
 
-      {photoPreview ? (
+      {preview ? (
         <div className="overflow-hidden rounded-2xl border bg-background">
           <Image
-            src={photoPreview}
+            src={preview}
             alt={t("Product photo preview")}
             width={800}
             height={800}
@@ -110,12 +141,7 @@ export function OrderProductFields({
             className="max-h-80 w-full object-contain"
           />
         </div>
-      ) : (
-        <div className="rounded-2xl border border-dashed bg-background p-5 text-center">
-          <IconCamera className="mx-auto size-7 text-muted-foreground" />
-          <p className="mt-2 text-sm text-muted-foreground">{t("No product photo selected")}</p>
-        </div>
-      )}
+      ) : null}
     </div>
   )
 }

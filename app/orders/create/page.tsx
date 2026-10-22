@@ -17,7 +17,12 @@ import {
   IconUser,
 } from "@tabler/icons-react"
 
-import { OrderProductFields, type ProductMode } from "@/components/order-product-fields"
+import {
+  OrderProductFields,
+  ProductPhotoField,
+  type ProductMode,
+} from "@/components/order-product-fields"
+import { OptionalSection } from "@/components/optional-section"
 import { SearchPicker } from "@/components/search-picker"
 import { FieldError, RequiredMark } from "@/components/field-error"
 import { UpgradeLink } from "@/components/upgrade-link"
@@ -49,6 +54,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -60,7 +66,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 
-import { resizeImageToDataUrl } from "../../lib/image-resize"
+import { photoSizeFor, resizeImageToDataUrl } from "../../lib/image-resize"
 import { readOrderWithOcr } from "../../lib/screenshot-ocr"
 import {
   buildCustomerSummaries,
@@ -154,17 +160,26 @@ class AiLimitError extends Error {
   }
 }
 
+// A busy or unreachable Gemini. Worth one quiet retry.
+class AiBusyError extends Error {}
+
 async function readOrderWithGemini(
   file: File
 ): Promise<{ data: ExtractedOrder; quota?: AiQuota }> {
   // A chat screenshot needs more detail than a product thumbnail.
   const image = await resizeImageToDataUrl(file, 1600, 0.8)
 
-  const response = await fetch("/api/extract-order", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image }),
-  })
+  let response: Response
+
+  try {
+    response = await fetch("/api/extract-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image }),
+    })
+  } catch {
+    throw new AiBusyError(translate("Could not reach the server. Check your connection"))
+  }
 
   const result = (await response.json().catch(() => null)) as {
     data?: ExtractedOrder
@@ -177,7 +192,11 @@ async function readOrderWithGemini(
   }
 
   if (!response.ok || !result?.data) {
-    throw new Error(translate(result?.error || "Gemini could not read this image"))
+    const message = translate(result?.error || "Gemini could not read this image")
+
+    throw response.status === 502 || response.status === 504
+      ? new AiBusyError(message)
+      : new Error(message)
   }
 
   return { data: result.data, quota: result.quota }
@@ -203,6 +222,7 @@ export default function CreateOrderPage() {
   const [phone, setPhone] = useState("")
   const [location, setLocation] = useState("")
   const [otherContacts, setOtherContacts] = useState("")
+  const [showMoreContacts, setShowMoreContacts] = useState(false)
 
   const [shops, setShops] = useState<LocalShop[]>([])
   const [shopMode, setShopMode] = useState<PickMode>("existing")
@@ -214,7 +234,6 @@ export default function CreateOrderPage() {
   const [productName, setProductName] = useState("")
   const [productSize, setProductSize] = useState("")
   const [productColor, setProductColor] = useState("")
-  const [productDescription, setProductDescription] = useState("")
   const [quantity, setQuantity] = useState("1")
   const [costPriceThb, setCostPriceThb] = useState("")
   const [sellingPriceThb, setSellingPriceThb] = useState("")
@@ -225,6 +244,18 @@ export default function CreateOrderPage() {
   const [amountPaidThb, setAmountPaidThb] = useState("")
 
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null)
+  const [saveScreenshot, setSaveScreenshot] = useState(false)
+  const [aiBusy, setAiBusy] = useState(false)
+  // A read that failed, kept so the user can try again without choosing the
+  // file again.
+  const [failedAi, setFailedAi] = useState<{
+    file: File
+    dataUrl: string
+    extractionId: number
+    tries: number
+  } | null>(null)
+  const [showMoreProduct, setShowMoreProduct] = useState(false)
+  const [showShopExtras, setShowShopExtras] = useState(false)
   const [screenshotPreview, setScreenshotPreview] = useState("")
   const [productMode, setProductMode] = useState<ProductMode>("existing")
   const [selectedProductId, setSelectedProductId] = useState("")
@@ -321,6 +352,7 @@ export default function CreateOrderPage() {
   }
 
   // AI is on when the account is known and has reads left.
+  const photo = photoSizeFor(isPro)
   const useGemini = aiQuota !== null && aiReadsLeft(aiQuota) > 0
   const aiExhausted = aiQuota !== null && !useGemini
 
@@ -343,10 +375,24 @@ export default function CreateOrderPage() {
     setLocation((value) => value || data.address)
     setOtherContacts((value) => value || data.otherContacts)
     setProductName((value) => value || data.productName)
-    setProductDescription((value) => value || data.productDescription)
     setProductSize((value) => value || data.productSize)
     setProductColor((value) => value || data.productColor)
-    setCustomerMessage((value) => value || data.customerMessage)
+    if (data.productColor || data.customerMessage || data.productDescription) {
+      setShowMoreProduct(true)
+    }
+    setCustomerMessage(
+      (value) =>
+        value ||
+        [data.customerMessage, data.productDescription].filter(Boolean).join("\n")
+    )
+    if (data.facebookName || data.otherContacts) {
+      if (
+        (data.facebookName && data.facebookName !== data.customerName) ||
+        data.otherContacts
+      ) {
+        setShowMoreContacts(true)
+      }
+    }
     if (data.quantity > 1) setQuantity(String(data.quantity))
     setSellingPriceThb(
       (value) =>
@@ -380,6 +426,8 @@ export default function CreateOrderPage() {
     setScreenshotPreview("")
     setReadStatus("")
     setPendingAi(null)
+    setFailedAi(null)
+    setSaveScreenshot(false)
 
     if (!file) return
 
@@ -461,12 +509,7 @@ export default function CreateOrderPage() {
         address: "",
         otherContacts: "",
         productName: "",
-        productDescription: [
-          ocr.productColor && `Color: ${ocr.productColor}`,
-          ocr.productSize && `Size: ${ocr.productSize}`,
-        ]
-          .filter(Boolean)
-          .join("\n"),
+        productDescription: "",
         productSize: ocr.productSize,
         productColor: ocr.productColor,
         quantity: 1,
@@ -486,21 +529,42 @@ export default function CreateOrderPage() {
     }
   }
 
-  // The user agreed: send the screenshot to Gemini.
-  async function readWithAi() {
-    if (!pendingAi) return
+  // The user agreed: send the screenshot to Gemini. A busy Gemini is retried
+  // once on its own; after that the user can try again by hand. The server
+  // gives back a failed read, so trying again costs nothing.
+  async function readWithAi(
+    target:
+      | { file: File; dataUrl: string; extractionId: number }
+      | null = pendingAi,
+    tries = 1
+  ) {
+    if (!target || aiBusy) return
 
-    const { file, dataUrl, extractionId } = pendingAi
+    const { file, dataUrl, extractionId } = target
 
     setPendingAi(null)
+    setFailedAi(null)
+    setAiBusy(true)
     setReadStatus(t("Reading the screenshot with Gemini..."))
 
     try {
-      const { data, quota } = await readOrderWithGemini(file)
+      let result: Awaited<ReturnType<typeof readOrderWithGemini>>
 
-      if (quota) setAiQuota(quota)
+      try {
+        result = await readOrderWithGemini(file)
+      } catch (caught) {
+        if (!(caught instanceof AiBusyError)) throw caught
 
-      showResult(data, extractionId, true)
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+
+        if (extractionIdRef.current !== extractionId) return
+
+        result = await readOrderWithGemini(file)
+      }
+
+      if (result.quota) setAiQuota(result.quota)
+
+      showResult(result.data, extractionId, true)
     } catch (caught) {
       if (caught instanceof AiLimitError) {
         // Used up elsewhere (another tab). Read on this device instead.
@@ -509,8 +573,23 @@ export default function CreateOrderPage() {
         return
       }
 
-      showReadError(caught, extractionId)
+      if (extractionIdRef.current === extractionId) {
+        setFailedAi({ file, dataUrl, extractionId, tries })
+        showReadError(caught, extractionId)
+      }
+    } finally {
+      setAiBusy(false)
     }
+  }
+
+  // After a failed read: stop trying and read on this device instead.
+  async function readFailedOnDevice() {
+    if (!failedAi) return
+
+    const { file, dataUrl, extractionId } = failedAi
+
+    setFailedAi(null)
+    await readOnDevice(file, dataUrl, extractionId)
   }
 
   // The user declined: nothing is sent, the screenshot is read on this device.
@@ -584,7 +663,6 @@ export default function CreateOrderPage() {
 
     const trimmedSize = productSize.trim()
     const trimmedColor = productColor.trim()
-    const trimmedDescription = productDescription.trim()
     const trimmedProductName = productName.trim()
     const quantityNumber = Number(quantity.trim())
     const costPriceNumber = toNumber(costPriceThb)
@@ -718,16 +796,20 @@ export default function CreateOrderPage() {
       // Photos go to Supabase Storage. Both are optional. A new product's
       // photo is also saved for the shop product, so deleting the order never
       // removes the shop's photo.
-      if (screenshotFile) {
+      if (screenshotFile && saveScreenshot) {
         orderScreenshotPath = await uploadPhoto(
-          await resizeImageToDataUrl(screenshotFile, 1600, 0.8),
+          await resizeImageToDataUrl(screenshotFile, photo.maxSide, photo.quality),
           "orders"
         )
         uploadedPaths.push(orderScreenshotPath)
       }
 
       if (productPhotoFile) {
-        const resized = await resizeImageToDataUrl(productPhotoFile, 1600, 0.8)
+        const resized = await resizeImageToDataUrl(
+          productPhotoFile,
+          photo.maxSide,
+          photo.quality
+        )
 
         productPhotoPath = await uploadPhoto(resized, "orders")
         uploadedPaths.push(productPhotoPath)
@@ -775,14 +857,13 @@ export default function CreateOrderPage() {
 
         sourceType: "customer_chat",
         customerMessageBurmese: customerMessage.trim(),
-        productName:
-          trimmedProductName || trimmedDescription || "Product photo order",
+        productName: trimmedProductName,
         productOption: trimmedSize,
         quantity: quantityNumber,
         productSize: trimmedSize,
         productColor: trimmedColor,
-        productDescription: trimmedDescription,
-        productNote: trimmedDescription,
+        productDescription: "",
+        productNote: "",
         retailerName: shopName,
         retailerUnitPriceThb: costPriceNumber,
         sellingUnitPriceThb: sellingPriceNumber,
@@ -867,11 +948,6 @@ export default function CreateOrderPage() {
             <CardTitle className="flex items-center gap-2 text-lg">
               <IconCamera className="size-5 text-muted-foreground" />{t("Chat Screenshot")}
             </CardTitle>
-            <CardDescription>
-              {useGemini
-                ? t("Optional. Upload the Messenger screenshot. With your OK, Gemini reads the customer, product and message details and fills the form")
-                : t("Optional. Upload the Messenger screenshot. The customer and product details are read on this device where possible")}
-            </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -898,9 +974,6 @@ export default function CreateOrderPage() {
                 <RichText text={t("Free accounts get {max} AI reads a month. Your reads come back next month. To upgrade to Pro for unlimited reads, contact {email}", { max: aiQuota?.max ?? 0 })} parts={{ email: <UpgradeLink /> }} />
               </p>
             ) : null}
-            <p className="text-xs text-muted-foreground">
-              <RichText text={t("Photos are deleted 7 days after you save the order. Pro accounts can keep them for 3 months from the order page. To upgrade, contact {email}")} parts={{ email: <UpgradeLink /> }} />
-            </p>
 
             {screenshotPreview ? (
               <div className="space-y-3">
@@ -916,10 +989,68 @@ export default function CreateOrderPage() {
                 </div>
 
                 {readStatus ? (
-                  <div className="flex items-start gap-2 rounded-xl border bg-background px-3 py-2 text-sm text-muted-foreground">
-                    <IconSparkles className="mt-0.5 size-4 shrink-0" />
-                    <span>{readStatus}</span>
+                  <div className="space-y-3 rounded-xl border bg-background px-3 py-2 text-sm text-muted-foreground">
+                    <div className="flex items-start gap-2">
+                      <IconSparkles className="mt-0.5 size-4 shrink-0" />
+                      <span>{readStatus}</span>
+                    </div>
+                    {failedAi ? (
+                      <div className="flex flex-wrap gap-2">
+                        {failedAi.tries < 3 ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="rounded-xl"
+                            disabled={aiBusy}
+                            onClick={() =>
+                              void readWithAi(failedAi, failedAi.tries + 1)
+                            }
+                          >
+                            {t("Try again")}
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="rounded-xl"
+                          disabled={aiBusy}
+                          onClick={() => void readFailedOnDevice()}
+                        >
+                          {t("Read on this device")}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="rounded-xl"
+                          onClick={() => {
+                            setFailedAi(null)
+                            setReadStatus("")
+                          }}
+                        >
+                          {t("Fill by hand")}
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
+                ) : null}
+
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={saveScreenshot}
+                    onCheckedChange={(checked) => setSaveScreenshot(checked === true)}
+                  />
+                  {t("Save this screenshot with the order")}
+                </label>
+                {saveScreenshot ? (
+                  <p className="text-xs text-muted-foreground">
+                    {t(
+                      isPro
+                        ? "Photos are kept for 6 months after they are saved"
+                        : "Photos are kept for 90 days after they are saved"
+                    )}
+                  </p>
                 ) : null}
               </div>
             ) : null}
@@ -997,13 +1128,6 @@ export default function CreateOrderPage() {
                   placeholder={t("Customer name")}
                 />
                 <TextField
-                  id="facebookName"
-                  label={t("Facebook name")}
-                  value={facebookName}
-                  onChange={setFacebookName}
-                  placeholder={t("Facebook display name")}
-                />
-                <TextField
                   id="phone"
                   label={t("Phone number")}
                   value={phone}
@@ -1021,17 +1145,31 @@ export default function CreateOrderPage() {
                     className="min-h-24 rounded-xl text-base"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="otherContacts">{t("Other contacts")}</Label>
-                  <Textarea
-                    id="otherContacts"
-                    value={otherContacts}
-                    onChange={(event) => setOtherContacts(event.target.value)}
-                    placeholder={t("Viber, Telegram, second phone")}
-                    className="min-h-20 rounded-xl text-base"
+                <OptionalSection
+                  label={t("Facebook or other contacts")}
+                  open={showMoreContacts}
+                  onOpenChange={setShowMoreContacts}
+                  hasValue={!!(facebookName.trim() || otherContacts.trim())}
+                >
+                  <TextField
+                    id="facebookName"
+                    label={t("Facebook name")}
+                    value={facebookName}
+                    onChange={setFacebookName}
+                    placeholder={t("Facebook display name")}
                   />
-                </div>
-                <p className="text-xs text-muted-foreground">{t("The customer is saved to your customer list with this order")}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="otherContacts">{t("Other contacts")}</Label>
+                    <Textarea
+                      id="otherContacts"
+                      value={otherContacts}
+                      onChange={(event) => setOtherContacts(event.target.value)}
+                      placeholder={t("Viber, Telegram, second phone")}
+                      className="min-h-20 rounded-xl text-base"
+                    />
+                  </div>
+                </OptionalSection>
+                <p className="text-xs text-muted-foreground">{t("The customer is saved to your customer list with this order. Add more details later in Data")}</p>
               </div>
             )}
           </CardContent>
@@ -1091,24 +1229,31 @@ export default function CreateOrderPage() {
               error={fieldErrors.newShopName}
                   placeholder={t("Bangkok shop")}
                 />
-                <TextField
-                  id="newShopPhone"
-                  label={t("Phone or LINE (optional)")}
-                  value={newShopPhone}
-                  onChange={setNewShopPhone}
-                  placeholder={t("Phone number or LINE ID")}
-                />
-                <div className="space-y-2">
-                  <Label htmlFor="newShopLocation">{t("Location (optional)")}</Label>
-                  <Textarea
-                    id="newShopLocation"
-                    value={newShopLocation}
-                    onChange={(event) => setNewShopLocation(event.target.value)}
-                    placeholder={t("Shop address, mall, or market")}
-                    className="min-h-20 rounded-xl text-base"
+                <OptionalSection
+                  label={t("Phone, LINE or location")}
+                  open={showShopExtras}
+                  onOpenChange={setShowShopExtras}
+                  hasValue={!!(newShopPhone.trim() || newShopLocation.trim())}
+                >
+                  <TextField
+                    id="newShopPhone"
+                    label={t("Phone or LINE (optional)")}
+                    value={newShopPhone}
+                    onChange={setNewShopPhone}
+                    placeholder={t("Phone number or LINE ID")}
                   />
-                </div>
-                <p className="text-xs text-muted-foreground">{t("The shop is saved to your shop list with this order")}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="newShopLocation">{t("Location (optional)")}</Label>
+                    <Textarea
+                      id="newShopLocation"
+                      value={newShopLocation}
+                      onChange={(event) => setNewShopLocation(event.target.value)}
+                      placeholder={t("Shop address, mall, or market")}
+                      className="min-h-20 rounded-xl text-base"
+                    />
+                  </div>
+                </OptionalSection>
+                <p className="text-xs text-muted-foreground">{t("The shop is saved to your shop list with this order. You can add more details later in Data")}</p>
               </div>
             )}
           </CardContent>
@@ -1118,7 +1263,7 @@ export default function CreateOrderPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <IconMessage2 className="size-5 text-muted-foreground" />{t("Product Info")}</CardTitle>
-            <CardDescription>{t("Record description, size, and color from the customer chat")}</CardDescription>
+            <CardDescription>{t("Product, price and customer note")}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -1132,9 +1277,6 @@ export default function CreateOrderPage() {
               onModeChange={setProductMode}
               productId={selectedProductId}
               onPickProduct={pickProduct}
-              photoPreview={productPhotoPreview}
-              onPhotoChange={handleProductPhotoChange}
-              photoLabel={t("Product photo (optional)")}
             />
 
             <TextField
@@ -1150,38 +1292,18 @@ export default function CreateOrderPage() {
               placeholder={t("Nike Air Force 1, dress, bag...")}
             />
 
-            <div className="space-y-2">
-              <Label htmlFor="productDescription">{t("Description")}</Label>
-              <Textarea
-                id="productDescription"
-                value={productDescription}
-                onChange={(event) => setProductDescription(event.target.value)}
-                placeholder={t("Dress, bag, shoes, or product note")}
-                className="min-h-24 rounded-xl text-base"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <TextField
-                id="productSize"
-                label={t("Size / variant")}
-                value={productSize}
-                onChange={(value) => {
-                setProductSize(value)
-                clearFieldError("productSize")
-              }}
-              required
-              error={fieldErrors.productSize}
-                placeholder={t("XS, 42, L...")}
-              />
-              <TextField
-                id="productColor"
-                label={t("Color")}
-                value={productColor}
-                onChange={setProductColor}
-                placeholder={t("White, black...")}
-              />
-            </div>
+            <TextField
+              id="productSize"
+              label={t("Size / variant")}
+              value={productSize}
+              onChange={(value) => {
+              setProductSize(value)
+              clearFieldError("productSize")
+            }}
+            required
+            error={fieldErrors.productSize}
+              placeholder={t("XS, 42, L...")}
+            />
 
             <div className="grid grid-cols-2 gap-3">
               <TextField
@@ -1249,6 +1371,19 @@ export default function CreateOrderPage() {
               />
             ) : null}
 
+            <OptionalSection
+              label={t("Color, note or photo")}
+              open={showMoreProduct}
+              onOpenChange={setShowMoreProduct}
+              hasValue={!!(productColor.trim() || customerMessage.trim() || productPhotoFile)}
+            >
+            <TextField
+              id="productColor"
+              label={t("Color")}
+              value={productColor}
+              onChange={setProductColor}
+              placeholder={t("White, black...")}
+            />
             <div className="space-y-2">
               <Label htmlFor="customerMessage">{t("Customer note")}</Label>
               <Textarea
@@ -1259,6 +1394,17 @@ export default function CreateOrderPage() {
                 className="min-h-24 rounded-xl text-base"
               />
             </div>
+              <ProductPhotoField
+                preview={productPhotoPreview}
+                onChange={handleProductPhotoChange}
+                label={t("Product photo (optional)")}
+                hint={t(
+                  isPro
+                    ? "Photos are kept for 6 months after they are saved"
+                    : "Photos are kept for 90 days after they are saved"
+                )}
+              />
+            </OptionalSection>
           </CardContent>
         </Card>
 

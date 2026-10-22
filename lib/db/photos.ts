@@ -111,17 +111,3 @@ export async function getPhotoExpiry(paths: (string | undefined | null)[]) {
 
   return expiry
 }
-
-// Pro accounts only: keeps these photos for 3 months from now. Returns the new
-// date. The database refuses the call for free accounts.
-export async function keepPhotosLonger(paths: (string | undefined | null)[]) {
-  const unique = [...new Set(paths.filter((path): path is string => !!path))]
-
-  const { data, error } = await getDb().rpc("keep_photos_longer", {
-    photo_paths: unique,
-  })
-
-  check(error, "Could not keep the photos longer")
-
-  return data as string
-}

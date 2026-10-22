@@ -6,7 +6,7 @@ Latli uses Supabase for:
 - **Database**: profiles, customers, shops, shop products, cargo companies and
   orders. Each user sees only their own rows (row level security).
 - **Storage**: a private `photos` bucket for order and product photos. Photos
-  are deleted after 7 days. Pro accounts can keep them for 3 months.
+  are deleted after 90 days (Free) or 6 months (Pro).
 
 Follow the steps in order. It takes about 10 minutes.
 
@@ -47,7 +47,7 @@ Follow the steps in order. It takes about 10 minutes.
 
 ## 3. Create the tables
 
-Open **SQL Editor > New query**. Run these ten files **in this order**, one
+Open **SQL Editor > New query**. Run these eleven files **in this order**, one
 after the other (paste the whole file, then press Run):
 
 1. `supabase/migrations/20261003000000_profiles.sql`
@@ -98,6 +98,11 @@ after the other (paste the whole file, then press Run):
 10. `supabase/migrations/20261022000000_ai_usage.sql`
     Counts AI screenshot reads per month (`ai_usage`). Free accounts are
     limited to 10 a month; Pro accounts are counted but not limited.
+
+11. `supabase/migrations/20261023000000_photo_retention_90_days.sql`
+    Photos are kept 90 days (Free) or 6 months (Pro) from when they are saved.
+    A plan change moves the dates of photos already saved. Removes the
+    "Keep photos for 3 months" button.
 
 Each file should end with "Success. No rows returned". Run each file only once.
 If one fails halfway, tell me the error message instead of running it again.
@@ -205,7 +210,7 @@ where email = 'manager@example.com';
 ```
 
 - To show an end date on the More page, also set `plan_expires_at = '2026-12-31'`.
-- `plan = 'pro'` unlocks **Keep photos for 3 months**.
+- `plan = 'pro'` keeps photos for 6 months instead of 90 days. Changing the plan moves the dates of photos already saved: going back to Free deletes longer-kept photos 90 days later.
 - `plan = 'pro'` removes the 10 AI reads a month limit.
 
 Plan and role cannot be changed from the app, only here.

@@ -4,6 +4,12 @@
 const DEFAULT_MAX_SIDE = 800
 const DEFAULT_JPEG_QUALITY = 0.75
 
+// Free accounts store small photos (they are kept for 90 days). Pro accounts
+// keep more detail (and keep the photos for 6 months).
+export function photoSizeFor(isPro: boolean) {
+  return isPro ? { maxSide: 1600, quality: 0.8 } : { maxSide: 800, quality: 0.7 }
+}
+
 export function resizeImageToDataUrl(
   file: File,
   maxSide = DEFAULT_MAX_SIDE,
