@@ -5,38 +5,35 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
-  IconAlertCircle,
-  IconBox,
-  IconCircleCheck,
+  IconAlertTriangle,
+  IconChevronLeft,
+  IconChevronRight,
   IconPackage,
-  IconPlus,
-  IconShoppingBag,
-  IconShoppingCartOff,
-  IconTruckDelivery,
+  IconTrophy,
+  IconUser,
 } from "@tabler/icons-react"
 
 import { BottomNavigation } from "@/components/bottom-navigation"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { MonthlySalesChart } from "@/components/monthly-sales-chart"
+import {
+  isSoldInMonth,
+  MonthlySalesChart,
+  type ReviewMonth,
+} from "@/components/monthly-sales-chart"
 import { Badge } from "@/components/ui/badge"
 
 import { type Currency, type LocalOrder } from "../lib/local-orders"
+import { getOrderCustomerKey } from "../lib/local-customers"
 import { listOrders } from "@/lib/db/orders"
-import { canUseSecondCurrency, fetchProfile } from "@/lib/profile"
+import { fetchProfile } from "@/lib/profile"
 import { createClient } from "@/lib/supabase/client"
-import { isUnpaid } from "@/lib/order-filters"
 import { messageOf } from "@/lib/db/shared"
 
-import { formatMoney, getOrderRate } from "../lib/currency"
+import { formatMoney } from "../lib/currency"
 import { useI18n } from "@/lib/i18n/provider"
-import { translate } from "@/lib/i18n/runtime"
+import { dateLocale, translate } from "@/lib/i18n/runtime"
 
 export default function DashboardPage() {
   const { t } = useI18n()
@@ -45,7 +42,10 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
   const [loadError, setLoadError] = useState("")
   const [baseCurrency, setBaseCurrency] = useState<Currency>("MMK")
-  const [profileSecond, setProfileSecond] = useState<Currency | null>(null)
+  const [month, setMonth] = useState<ReviewMonth>(() => {
+    const now = new Date()
+    return { year: now.getFullYear(), index: now.getMonth() }
+  })
   const [isPro, setIsPro] = useState(false)
 
   useEffect(() => {
@@ -64,9 +64,6 @@ export default function DashboardPage() {
           if (profile) {
             setIsPro(profile.plan === "pro")
             setBaseCurrency(profile.baseCurrency)
-            setProfileSecond(
-              canUseSecondCurrency(profile) ? profile.secondaryCurrency : null
-            )
           }
         }
       } catch (error) {
@@ -83,39 +80,13 @@ export default function DashboardPage() {
     }
   }, [])
 
-  // Pro accounts show their second currency. Free accounts only show one, but
-  // keep showing the old customer currency when they already have orders in it.
-  const secondCurrency = useMemo<Currency | null>(() => {
-    if (profileSecond) return profileSecond
-
-    const legacy = orders.find(
-      (order) => order.customerCurrency !== order.baseCurrency
+  // Orders still to buy, one line per shop. Orders without a shop name are
+  // grouped under "No shop". Refunded orders are not waiting to be bought.
+  const toBuy = useMemo(() => {
+    const notBought = orders.filter(
+      (order) =>
+        order.orderStatus === "not_bought" && order.paymentStatus !== "refunded"
     )
-
-    return legacy?.customerCurrency ?? null
-  }, [orders, profileSecond])
-
-  const summary = useMemo(() => {
-    const withStatus = (status: LocalOrder["orderStatus"]) =>
-      orders.filter((order) => order.orderStatus === status)
-
-    // Refunded orders are not waiting to be bought.
-    const notBought = withStatus("not_bought").filter(
-      (order) => order.paymentStatus !== "refunded"
-    )
-    const bought = withStatus("bought")
-    const sentCargo = withStatus("sent_cargo")
-    const delivered = withStatus("delivered")
-    const complete = withStatus("complete")
-
-    const unpaid = orders.filter(isUnpaid)
-
-    const refunded = orders.filter(
-      (order) => order.paymentStatus === "refunded"
-    )
-
-    // Orders to buy, one line per shop. Orders without a shop name are
-    // grouped under "No shop".
     const countsByShop = new Map<string, { label: string; count: number }>()
     let noShopCount = 0
 
@@ -137,48 +108,79 @@ export default function DashboardPage() {
       }
     }
 
-    const shopLines = [...countsByShop.values()].sort((a, b) =>
-      a.label.localeCompare(b.label)
-    )
-
-    // Refunded orders are not real sales, so they stay out of sales and profit.
-    const soldOrders = orders.filter(
-      (order) => order.paymentStatus !== "refunded"
-    )
-
-    const sum = (
-      list: LocalOrder[],
-      value: (order: LocalOrder) => number
-    ) => list.reduce((total, order) => total + value(order), 0)
-
-    const withRate = (value: (order: LocalOrder) => number) =>
-      (order: LocalOrder) => value(order) * getOrderRate(order)
-
-    const salesThb = (order: LocalOrder) => order.totalCustomerPayableThb
-    const profitThb = (order: LocalOrder) => order.profitThb
-    const unpaidThb = (order: LocalOrder) => order.remainingBalanceThb
-    const refundThb = (order: LocalOrder) => order.totalPaidThb
-
     return {
-      notBoughtCount: withStatus("not_bought").length,
-      boughtCount: bought.length,
-      sentCargoCount: sentCargo.length,
-      deliveredCount: delivered.length,
-      completeCount: complete.length,
-      unpaidCount: unpaid.length,
-      refundCount: refunded.length,
-      shopLines,
+      count: notBought.length,
       noShopCount,
-      totalSalesThb: sum(soldOrders, salesThb),
-      totalSalesMmk: sum(soldOrders, withRate(salesThb)),
-      profitThb: sum(soldOrders, profitThb),
-      profitMmk: sum(soldOrders, withRate(profitThb)),
-      unpaidThb: sum(unpaid, unpaidThb),
-      unpaidMmk: sum(unpaid, withRate(unpaidThb)),
-      refundThb: sum(refunded, refundThb),
-      refundMmk: sum(refunded, withRate(refundThb)),
+      shopLines: [...countsByShop.values()].sort((a, b) =>
+        a.label.localeCompare(b.label)
+      ),
     }
   }, [orders])
+
+  // The best customer and product of the month on screen.
+  const top = useMemo(() => {
+    const customers = new Map<
+      string,
+      { key: string; name: string; sales: number; orders: number }
+    >()
+    const products = new Map<
+      string,
+      { name: string; units: number; sales: number }
+    >()
+
+    for (const order of orders) {
+      if (!isSoldInMonth(order, month)) continue
+
+      const customerKey = getOrderCustomerKey(order)
+      const customer = customers.get(customerKey) ?? {
+        key: customerKey,
+        name: order.customerName,
+        sales: 0,
+        orders: 0,
+      }
+
+      customer.sales += order.totalCustomerPayableThb
+      customer.orders += 1
+      customers.set(customerKey, customer)
+
+      const productName = order.productName?.trim()
+
+      if (productName) {
+        const productKey = productName.toLowerCase()
+        const product = products.get(productKey) ?? {
+          name: productName,
+          units: 0,
+          sales: 0,
+        }
+
+        product.units += order.quantity ?? 1
+        product.sales += order.totalCustomerPayableThb
+        products.set(productKey, product)
+      }
+    }
+
+    return {
+      customer: [...customers.values()].sort((a, b) => b.sales - a.sales)[0],
+      product: [...products.values()].sort(
+        (a, b) => b.units - a.units || b.sales - a.sales
+      )[0],
+    }
+  }, [orders, month])
+
+  const monthLabel = new Date(month.year, month.index, 1).toLocaleDateString(
+    dateLocale(),
+    { month: "long", year: "numeric" }
+  )
+  const now = new Date()
+  const isCurrentMonth =
+    month.year === now.getFullYear() && month.index === now.getMonth()
+
+  function shiftMonth(by: number) {
+    setMonth((current) => {
+      const next = new Date(current.year, current.index + by, 1)
+      return { year: next.getFullYear(), index: next.getMonth() }
+    })
+  }
 
   if (!mounted) {
     return (
@@ -193,17 +195,9 @@ export default function DashboardPage() {
   return (
     <main className="min-h-dvh bg-muted pb-24">
       <header className="sticky top-0 z-10 border-b bg-background/95 px-5 py-4 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted-foreground">{t("Welcome back")}</p>
-            <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Dashboard")}</h1>
-          </div>
-
-          <Button asChild size="icon" className="size-11 rounded-xl">
-            <Link href="/orders/create" aria-label={t("Add order")}>
-              <IconPlus className="size-5" />
-            </Link>
-          </Button>
+        <div className="mx-auto w-full max-w-md">
+          <p className="text-sm text-muted-foreground">{t("Welcome back")}</p>
+          <h1 className="font-heading text-2xl font-medium tracking-tight">{t("Monthly review")}</h1>
         </div>
       </header>
 
@@ -214,139 +208,129 @@ export default function DashboardPage() {
           </Alert>
         ) : null}
 
-        <section className="space-y-3">
-          <h2 className="font-heading text-lg font-medium">{t("Orders")}</h2>
-
-          <div className="grid grid-cols-2 gap-3">
-            <StatusMiniCard
-              title={t("Not bought")}
-              value={summary.notBoughtCount}
-              href="/orders?status=not_bought"
-              icon={IconShoppingCartOff}
-            />
-            <StatusMiniCard
-              title={t("Bought")}
-              value={summary.boughtCount}
-              href="/orders?status=bought"
-              icon={IconPackage}
-            />
-            <StatusMiniCard
-              title={t("With cargo")}
-              value={summary.sentCargoCount}
-              href="/orders?status=sent_cargo"
-              icon={IconTruckDelivery}
-            />
-            <StatusMiniCard
-              title={t("Delivered")}
-              value={summary.deliveredCount}
-              href="/orders?status=delivered"
-              icon={IconBox}
-            />
-            <StatusMiniCard
-              title={t("Complete")}
-              value={summary.completeCount}
-              href="/orders?status=complete"
-              icon={IconCircleCheck}
-            />
-            <StatusMiniCard
-              title={t("Unpaid")}
-              value={summary.unpaidCount}
-              href="/orders?payment=unpaid"
-              icon={IconAlertCircle}
-            />
-          </div>
-        </section>
-
-        <Card className="rounded-[20px] shadow-none">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-base font-medium">
-                <IconShoppingBag className="size-5 text-muted-foreground" />{t("Orders to buy")}</span>
-              <Badge variant={summary.notBoughtCount > 0 ? "default" : "secondary"}>
-                {summary.notBoughtCount}
+        <Card
+          className={
+            toBuy.count > 0
+              ? "rounded-[20px] border-2 border-amber-400 bg-amber-50 shadow-none dark:border-amber-500/70 dark:bg-amber-950/30"
+              : "rounded-[20px] shadow-none"
+          }
+        >
+          <CardContent className="space-y-3 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <IconAlertTriangle
+                  className={
+                    toBuy.count > 0
+                      ? "size-5 text-amber-600 dark:text-amber-400"
+                      : "size-5 text-muted-foreground"
+                  }
+                />
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t("To do")}
+                  </p>
+                  <h2 className="font-heading text-base font-medium">{t("Buy these orders")}</h2>
+                </div>
+              </div>
+              <Badge variant={toBuy.count > 0 ? "default" : "secondary"}>
+                {toBuy.count}
               </Badge>
-            </CardTitle>
-          </CardHeader>
+            </div>
 
-          <CardContent className="space-y-3">
-            {summary.notBoughtCount === 0 ? (
+            {toBuy.count === 0 ? (
               <div className="rounded-2xl bg-muted p-4">
                 <p className="text-sm font-medium">{t("No orders waiting to buy")}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{t("New customer orders with status Not bought will show here")}</p>
               </div>
             ) : (
               <ul className="divide-y rounded-2xl border bg-background">
-                {summary.shopLines.map((shop) => (
+                {toBuy.shopLines.map((shop) => (
                   <ShopLine
                     key={shop.label.toLowerCase()}
                     label={shop.label}
                     count={shop.count}
                   />
                 ))}
-                {summary.noShopCount > 0 ? (
-                  <ShopLine label={t("No shop")} count={summary.noShopCount} />
+                {toBuy.noShopCount > 0 ? (
+                  <ShopLine label={t("No shop")} count={toBuy.noShopCount} />
                 ) : null}
               </ul>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <Button asChild variant="outline" className="h-11 rounded-xl">
-                <Link href="/orders">{t("View all")}</Link>
+            {toBuy.count > 0 ? (
+              <Button asChild className="h-11 w-full rounded-xl">
+                <Link href="/orders?status=not_bought">{t("View orders to buy")}</Link>
               </Button>
-              <Button asChild className="h-11 rounded-xl">
-                <Link href="/orders/create">
-                  <IconPlus className="mr-2 size-4" />{t("Add order")}</Link>
-              </Button>
-            </div>
+            ) : null}
           </CardContent>
         </Card>
 
         <section className="space-y-3">
-          <h2 className="font-heading text-lg font-medium">{t("Money")}</h2>
+          <div className="flex items-center justify-between gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="size-10 shrink-0 rounded-full"
+              onClick={() => shiftMonth(-1)}
+              aria-label={t("Previous month")}
+            >
+              <IconChevronLeft className="size-5" />
+            </Button>
+            <h2 className="min-w-0 flex-1 text-center font-heading text-lg font-medium">
+              {monthLabel}
+            </h2>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="size-10 shrink-0 rounded-full"
+              disabled={isCurrentMonth}
+              onClick={() => shiftMonth(1)}
+              aria-label={t("Next month")}
+            >
+              <IconChevronRight className="size-5" />
+            </Button>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <MoneyBox
-              baseCurrency={baseCurrency}
-              secondCurrency={secondCurrency}
-              title={t("Total sales")}
-              href="/orders"
-              base={summary.totalSalesThb}
-              second={summary.totalSalesMmk}
+            <TopCard
+              title={t("Top customer")}
+              icon={IconUser}
+              name={top.customer?.name}
+              detail={
+                top.customer
+                  ? `${formatMoney(top.customer.sales, baseCurrency)} · ${t(
+                      top.customer.orders === 1 ? "{count} order" : "{count} orders",
+                      { count: top.customer.orders }
+                    )}`
+                  : ""
+              }
+              href={
+                top.customer
+                  ? `/customers/${encodeURIComponent(top.customer.key)}`
+                  : undefined
+              }
             />
-            <MoneyBox
-              baseCurrency={baseCurrency}
-              secondCurrency={secondCurrency}
-              title={t("Profit")}
-              href="/orders"
-              base={summary.profitThb}
-              second={summary.profitMmk}
-            />
-            <MoneyBox
-              baseCurrency={baseCurrency}
-              secondCurrency={secondCurrency}
-              title={t("Unpaid")}
-              href="/orders?payment=unpaid"
-              base={summary.unpaidThb}
-              second={summary.unpaidMmk}
-            />
-            <MoneyBox
-              baseCurrency={baseCurrency}
-              secondCurrency={secondCurrency}
-              title={t("Refund")}
-              href="/orders?payment=refunded"
-              base={summary.refundThb}
-              second={summary.refundMmk}
+            <TopCard
+              title={t("Top product")}
+              icon={IconPackage}
+              name={top.product?.name}
+              detail={
+                top.product
+                  ? `${t("{count} sold", { count: top.product.units })} · ${formatMoney(top.product.sales, baseCurrency)}`
+                  : ""
+              }
             />
           </div>
 
-          <MonthlySalesChart orders={orders} currency={baseCurrency} />
+          <MonthlySalesChart orders={orders} currency={baseCurrency} month={month} />
           {isPro ? (
             <Button asChild variant="outline" className="w-full rounded-xl">
               <Link href="/dashboard/charts">{t("See more charts")}</Link>
             </Button>
           ) : null}
         </section>
-
       </div>
 
       <BottomNavigation active="dashboard" />
@@ -367,60 +351,44 @@ function ShopLine({ label, count }: { label: string; count: number }) {
   )
 }
 
-function StatusMiniCard({
+function TopCard({
   title,
-  value,
-  href,
   icon: Icon,
-}: {
-  title: string
-  value: number
-  href: string
-  icon: React.ElementType
-}) {
-  return (
-    <Link href={href} className="block">
-      <div className="rounded-[20px] border bg-background p-4 transition active:scale-[0.99]">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex size-10 items-center justify-center rounded-2xl bg-muted">
-            <Icon className="size-5 text-muted-foreground" />
-          </div>
-          <p className="text-2xl font-semibold">{value}</p>
-        </div>
-        <p className="mt-3 text-sm font-medium">{title}</p>
-      </div>
-    </Link>
-  )
-}
-
-function MoneyBox({
-  title,
+  name,
+  detail,
   href,
-  base,
-  second,
-  baseCurrency,
-  secondCurrency,
 }: {
   title: string
-  href: string
-  base: number
-  second: number
-  baseCurrency: Currency
-  secondCurrency: Currency | null
+  icon: React.ElementType
+  name?: string
+  detail: string
+  href?: string
 }) {
-  return (
-    <Link href={href} className="block">
-      <div className="h-full rounded-[20px] border bg-background p-4 transition active:scale-[0.99]">
-        <p className="text-sm font-medium text-muted-foreground">{title}</p>
-        <p className="mt-2 break-words text-lg font-semibold">
-          {formatMoney(base, baseCurrency)}
-        </p>
-        {secondCurrency ? (
-          <p className="mt-0.5 break-words text-xs text-muted-foreground">
-            {formatMoney(second, secondCurrency)}
-          </p>
-        ) : null}
+  const { t } = useI18n()
+
+  const body = (
+    <div className="h-full rounded-[20px] border bg-background p-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+        <Icon className="size-4" />
+        {title}
+        <IconTrophy className="ml-auto size-4 text-amber-500" />
       </div>
+      {name ? (
+        <>
+          <p className="mt-2 break-words text-base font-semibold">{name}</p>
+          <p className="mt-0.5 break-words text-xs text-muted-foreground">{detail}</p>
+        </>
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground">{t("No orders this month")}</p>
+      )}
+    </div>
+  )
+
+  return href ? (
+    <Link href={href} className="block">
+      {body}
     </Link>
+  ) : (
+    body
   )
 }

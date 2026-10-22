@@ -1,9 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
+import { useMemo } from "react"
 import {
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -19,9 +19,26 @@ import type { Currency, LocalOrder } from "@/app/lib/local-orders"
 import { useI18n } from "@/lib/i18n/provider"
 import { dateLocale } from "@/lib/i18n/runtime"
 
+export type ReviewMonth = { year: number; index: number }
+
 type Props = {
   orders: LocalOrder[]
   currency: Currency
+  month: ReviewMonth
+}
+
+// True when the order was created in the month. Refunded orders are not sales,
+// so the monthly review leaves them out.
+export function isSoldInMonth(order: LocalOrder, month: ReviewMonth) {
+  if (order.paymentStatus === "refunded") return false
+
+  const date = new Date(order.createdAt)
+
+  return (
+    !Number.isNaN(date.getTime()) &&
+    date.getFullYear() === month.year &&
+    date.getMonth() === month.index
+  )
 }
 
 function csvCell(value: string | number) {
@@ -41,47 +58,36 @@ function compact(value: number) {
   }).format(value)
 }
 
-// Sales for each day of one month, in the primary currency. Refunded orders
-// are not sales.
-export function MonthlySalesChart({ orders, currency }: Props) {
+// Sales and profit for each day of one month, in the primary currency.
+export function MonthlySalesChart({ orders, currency, month }: Props) {
   const { t } = useI18n()
 
-  const [month, setMonth] = useState(() => {
-    const now = new Date()
-    return { year: now.getFullYear(), index: now.getMonth() }
-  })
-
-  const now = new Date()
-  const isCurrentMonth =
-    month.year === now.getFullYear() && month.index === now.getMonth()
-
-  const { days, total, monthOrders } = useMemo(() => {
+  const { days, total, totalProfit, monthOrders } = useMemo(() => {
     const count = new Date(month.year, month.index + 1, 0).getDate()
-    const days = Array.from({ length: count }, (_, i) => ({ day: i + 1, sales: 0 }))
+    const days = Array.from({ length: count }, (_, i) => ({
+      day: i + 1,
+      sales: 0,
+      profit: 0,
+    }))
     const monthOrders: LocalOrder[] = []
     let total = 0
+    let totalProfit = 0
 
     for (const order of orders) {
-      if (order.paymentStatus === "refunded") continue
+      if (!isSoldInMonth(order, month)) continue
 
       const date = new Date(order.createdAt)
 
-      if (
-        Number.isNaN(date.getTime()) ||
-        date.getFullYear() !== month.year ||
-        date.getMonth() !== month.index
-      ) {
-        continue
-      }
-
       days[date.getDate() - 1].sales += order.totalCustomerPayableThb
+      days[date.getDate() - 1].profit += order.profitThb
       total += order.totalCustomerPayableThb
+      totalProfit += order.profitThb
       monthOrders.push(order)
     }
 
     monthOrders.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
-    return { days, total, monthOrders }
+    return { days, total, totalProfit, monthOrders }
   }, [orders, month])
 
   const label = new Date(month.year, month.index, 1).toLocaleDateString(
@@ -89,17 +95,10 @@ export function MonthlySalesChart({ orders, currency }: Props) {
     { month: "long", year: "numeric" }
   )
 
-  function shift(by: number) {
-    setMonth((current) => {
-      const next = new Date(current.year, current.index + by, 1)
-      return { year: next.getFullYear(), index: next.getMonth() }
-    })
-  }
-
   // One file with the month's orders, then the total for each day.
   function handleExport() {
     const rows: (string | number)[][] = [
-      ["Order", "Date", "Customer", "Order status", "Payment status", `Amount (${currency})`],
+      ["Order", "Date", "Customer", "Order status", "Payment status", `Amount (${currency})`, `Profit (${currency})`],
       ...monthOrders.map((order) => {
         const date = new Date(order.createdAt)
 
@@ -110,15 +109,17 @@ export function MonthlySalesChart({ orders, currency }: Props) {
           order.orderStatus,
           order.paymentStatus,
           Math.round(order.totalCustomerPayableThb),
+          Math.round(order.profitThb),
         ]
       }),
       [],
-      ["Date", `Sales (${currency})`],
+      ["Date", `Sales (${currency})`, `Profit (${currency})`],
       ...days.map((entry) => [
         dayKey(month.year, month.index, entry.day),
         Math.round(entry.sales),
+        Math.round(entry.profit),
       ]),
-      ["Total", Math.round(total)],
+      ["Total", Math.round(total), Math.round(totalProfit)],
     ]
 
     const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n")
@@ -136,41 +137,27 @@ export function MonthlySalesChart({ orders, currency }: Props) {
   return (
     <Card className="rounded-[20px] shadow-none">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-medium">{t("Monthly sales")}</CardTitle>
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="size-10 shrink-0 rounded-full"
-            onClick={() => shift(-1)}
-            aria-label={t("Previous month")}
-          >
-            <IconChevronLeft className="size-5" />
-          </Button>
-          <span className="min-w-0 flex-1 text-center text-sm font-medium">{label}</span>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="size-10 shrink-0 rounded-full"
-            disabled={isCurrentMonth}
-            onClick={() => shift(1)}
-            aria-label={t("Next month")}
-          >
-            <IconChevronRight className="size-5" />
-          </Button>
-        </div>
+        <CardTitle className="text-base font-medium">{t("Sales & profit")}</CardTitle>
       </CardHeader>
 
       <CardContent>
-        <p className="text-sm text-muted-foreground">
-          {t("Month total")}:{" "}
-          <span className="font-semibold text-foreground">
-            {formatMoney(total, currency)}
-          </span>
-          {total === 0 ? ` · ${t("No sales this month")}` : ""}
-        </p>
+        <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
+          <p>
+            {t("Sales")}
+            <span className="block font-semibold text-foreground">
+              {formatMoney(total, currency)}
+            </span>
+          </p>
+          <p>
+            {t("Profit")}
+            <span className="block font-semibold text-foreground">
+              {formatMoney(totalProfit, currency)}
+            </span>
+          </p>
+        </div>
+        {total === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground">{t("No sales this month")}</p>
+        ) : null}
 
         <Button
           type="button"
@@ -202,7 +189,7 @@ export function MonthlySalesChart({ orders, currency }: Props) {
                 tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
               />
               <Tooltip
-                formatter={(value) => [formatMoney(Number(value), currency), t("Sales")]}
+                formatter={(value, name) => [formatMoney(Number(value), currency), name]}
                 labelFormatter={(day) => `${label.split(" ")[0]} ${day}`}
                 contentStyle={{
                   borderRadius: 12,
@@ -211,10 +198,21 @@ export function MonthlySalesChart({ orders, currency }: Props) {
                   fontSize: 12,
                 }}
               />
+              <Legend iconType="plainline" wrapperStyle={{ fontSize: 12 }} />
               <Line
                 type="monotone"
                 dataKey="sales"
+                name={t("Sales")}
                 stroke="var(--primary)"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="profit"
+                name={t("Profit")}
+                stroke="var(--chart-2)"
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
