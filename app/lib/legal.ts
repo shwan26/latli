@@ -10,4 +10,4 @@ export const LEGAL = {
   governingLaw: "",
 }
 
-export const LEGAL_LAST_UPDATED = "3 October 2026"
+export const LEGAL_LAST_UPDATED = "23 October 2026"

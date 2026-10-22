@@ -23,8 +23,6 @@ export default function robots(): MetadataRoute.Robots {
           "/reset-password",
         ],
       },
-      // The AdSense crawler must be able to read every public page.
-      { userAgent: "Mediapartners-Google", allow: "/" },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,
   }

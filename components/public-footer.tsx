@@ -1,5 +1,6 @@
 import Link from "next/link"
 
+import { MessengerButton } from "@/components/messenger-button"
 import { getI18n } from "@/lib/i18n/server"
 
 // Bottom bar of the public pages: credit and links to the pages anyone can open.
@@ -31,6 +32,7 @@ export async function PublicFooter() {
           </Link>
         </nav>
       </div>
+      <MessengerButton />
     </footer>
   )
 }

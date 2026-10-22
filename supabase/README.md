@@ -34,6 +34,8 @@ Follow the steps in order. It takes about 10 minutes.
 
 4. Restart `pnpm dev` after changing this file.
 
+- `NEXT_PUBLIC_FACEBOOK_PAGE` (optional) is your Facebook Page username, for
+  example `latli.app`. It turns on the Messenger chat button on the public pages.
 - `GEMINI_API_KEY` reads order screenshots for every account. Free accounts get 10 reads a month, Pro accounts are not limited.
   Optional: `GEMINI_MODEL` (default `gemini-3.1-flash-lite`) and
   `GEMINI_FALLBACK_MODELS` (default `gemini-2.5-flash-lite,gemini-3-flash`). When
