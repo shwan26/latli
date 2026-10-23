@@ -11,25 +11,16 @@ import {
 
 import { PublicFooter } from "@/components/public-footer"
 import { PublicNavbar } from "@/components/public-navbar"
-import { LandingPhonePreview } from "@/components/landing-phone-preview"
+import { LandingDemo } from "@/components/landing-demo"
 import { Button } from "@/components/ui/button"
 import { getI18n } from "@/lib/i18n/server"
 
-const metrics = [
-  { label: "Order progress", value: "1 view", icon: IconPackage },
-  { label: "Payments due", value: "Clear", icon: IconClock },
-  { label: "Delivery status", value: "Live", icon: IconRoute },
-  { label: "Customer history", value: "Ready", icon: IconUsers },
+const trust = [
+  "Free plan, no card needed",
+  "Works on your phone",
+  "Set up in 2 minutes",
 ]
 
-const features = [
-  "Capture each customer request with the product, shop, cost, selling price, payment, and delivery status",
-  "Keep customers and shops organized so you can find previous orders, prices, contacts, and repeat buyers",
-  "See sales, costs, unpaid balances, refunds, and profit instead of guessing from chat messages",
-  "Use monthly and customer data to see what sells, which shops perform well, and where your profit comes from",
-]
-
-// The two sections below are English only for now.
 const steps = [
   {
     title: "Record the order",
@@ -52,7 +43,7 @@ const faqs = [
   },
   {
     question: "Is it free?",
-    answer: "Yes. The Free plan covers orders, customers, shops, payments and the profit dashboard. The Pro plan adds advanced charts, a second currency and longer photo storage.",
+    answer: "Yes. Every new account gets 14 days of Pro, with no card needed. After that you stay on the Free plan, which covers orders, customers, shops, payments and the profit dashboard. The Pro plan adds advanced charts, a second currency and longer photo storage.",
   },
   {
     question: "Is my customers' information private?",
@@ -87,10 +78,19 @@ export default async function Home() {
                 size="lg"
                 className="h-12 rounded-lg px-6 text-sm tracking-normal"
               >
-                <Link href="/login">{t("Start managing orders")}<IconArrowRight className="size-4" />
+                <Link href="/register">{t("Start free for 2 weeks")}<IconArrowRight className="size-4" />
                 </Link>
               </Button>
             </div>
+
+            <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-[#4d463b]">
+              {trust.map((item) => (
+                <li key={item} className="flex items-center gap-1.5">
+                  <IconCheck className="size-4 text-[#184f3b]" />
+                  {t(item)}
+                </li>
+              ))}
+            </ul>
 
             <div className="mt-10 grid grid-cols-3 gap-4 border-t border-[#ded6c9] pt-6">
               <Stat value="1" label={t("Place for every order")} />
@@ -99,70 +99,41 @@ export default async function Home() {
             </div>
           </div>
 
-          <LandingPhonePreview />
+          <LandingDemo />
         </div>
       </section>
+
 
       <section className="px-5 py-16 md:py-20">
         <div className="mx-auto w-full max-w-6xl">
-          <div className="grid gap-4 md:grid-cols-4">
-            {metrics.map((metric) => (
-              <MetricCard key={metric.label} {...metric} label={t(metric.label)} />
-            ))}
-          </div>
-
-          <div className="mt-16 grid gap-10 md:grid-cols-[0.9fr_1.1fr] md:items-start">
-            <div>
-              <p className="text-sm font-semibold uppercase text-[#8a5a20]">{t("Built for shop owners")}</p>
-              <h2 className="mt-3 font-heading text-4xl font-semibold leading-tight">{t("Stop managing your business from scattered chats and notebooks")}</h2>
-            </div>
-
-            <div className="grid gap-3">
-              {features.map((feature) => (
-                <div
-                  key={feature}
-                  className="flex gap-3 rounded-lg border border-[#ded6c9] bg-[#fbfaf7] p-4"
-                >
-                  <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-[#184f3b] text-white">
-                    <IconCheck className="size-4" />
-                  </span>
-                  <p className="leading-7 text-[#4d463b]">{t(feature)}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-t border-[#ded6c9] bg-[#fbfaf7] px-5 py-16 md:py-20">
-        <div className="mx-auto w-full max-w-6xl">
-          <h2 className="font-heading text-4xl font-semibold leading-tight">How Latli works</h2>
+          <h2 className="font-heading text-4xl font-semibold leading-tight">{t("How Latli works")}</h2>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {steps.map((step, index) => (
               <div key={step.title} className="rounded-lg border border-[#ded6c9] bg-white p-5">
                 <p className="font-heading text-3xl font-semibold text-[#8a5a20]">{index + 1}</p>
-                <h3 className="mt-3 font-heading text-xl font-semibold">{step.title}</h3>
-                <p className="mt-2 leading-7 text-[#605848]">{step.text}</p>
+                <h3 className="mt-3 font-heading text-xl font-semibold">{t(step.title)}</h3>
+                <p className="mt-2 leading-7 text-[#605848]">{t(step.text)}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="px-5 py-16 md:py-20">
+
+      <section className="border-t border-[#ded6c9] bg-[#fbfaf7] px-5 py-16 md:py-20">
         <div className="mx-auto w-full max-w-3xl">
-          <h2 className="font-heading text-4xl font-semibold leading-tight">Questions shop owners ask</h2>
+          <h2 className="font-heading text-4xl font-semibold leading-tight">{t("Questions shop owners ask")}</h2>
           <div className="mt-8 space-y-4">
             {faqs.map((faq) => (
               <div key={faq.question} className="rounded-lg border border-[#ded6c9] bg-[#fbfaf7] p-5">
-                <h3 className="font-heading text-lg font-semibold">{faq.question}</h3>
-                <p className="mt-2 leading-7 text-[#605848]">{faq.answer}</p>
+                <h3 className="font-heading text-lg font-semibold">{t(faq.question)}</h3>
+                <p className="mt-2 leading-7 text-[#605848]">{t(faq.answer)}</p>
               </div>
             ))}
           </div>
           <p className="mt-8 leading-7 text-[#605848]">
-            New to running a shop from chat apps? Read our{" "}
-            <Link href="/blog" className="underline underline-offset-4">guides for shop owners</Link>.
+            {t("New to running a shop from chat apps? Read our")}{" "}
+            <Link href="/blog" className="underline underline-offset-4">{t("guides for shop owners")}</Link>.
           </p>
         </div>
       </section>

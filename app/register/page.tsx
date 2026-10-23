@@ -157,6 +157,7 @@ export default function CreateAccountPage() {
           <h1 className="sr-only">{t("Latli")}</h1>
 
           <p className="mt-1.5 text-sm text-muted-foreground">{t("Set up your shop to manage orders and deliveries")}</p>
+          <p className="mt-2 inline-block rounded-lg bg-muted px-3 py-1.5 text-xs font-medium">{t("Includes 14 days of Pro. No card needed")}</p>
         </div>
 
         <Card className="w-full rounded-[20px] shadow-none">
@@ -171,6 +172,7 @@ export default function CreateAccountPage() {
                 <Alert className="rounded-xl">
                   <AlertDescription>
                     {t("We sent a confirmation link to {email}. Open it to activate your account, then log in", { email: email.trim() })}
+                    <span className="mt-2 block">{t("Your 14-day Pro trial has started")}</span>
                     <span className="mt-2 block">{t("If you can't find it in your inbox, check your spam folder")}</span>
                   </AlertDescription>
                 </Alert>

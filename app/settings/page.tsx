@@ -23,6 +23,7 @@ import {
   DEFAULT_PROFILE,
   fetchAiQuota,
   fetchProfile,
+  proDaysLeft,
   type AiQuota,
   type ProfileSettings,
 } from "@/lib/profile"
@@ -88,6 +89,8 @@ export default function SettingsPage() {
           dateStyle: "long",
         }).format(new Date(profile.planExpiresAt))
       : ""
+
+  const daysLeft = proDaysLeft(profile)
 
   async function handleLogout() {
     await createClient().auth.signOut()
@@ -159,7 +162,9 @@ export default function SettingsPage() {
                   <IconCrown className="size-4" />
                   {t("Pro plan")}
                 </span>
-                {expiryDate ? (
+                {daysLeft !== null && daysLeft <= 14 ? (
+                  <span>{t(daysLeft === 1 ? "{count} day left" : "{count} days left", { count: daysLeft })}</span>
+                ) : expiryDate ? (
                   <span>{t("Expires {date}", { date: expiryDate })}</span>
                 ) : null}
               </div>
