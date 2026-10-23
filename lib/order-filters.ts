@@ -10,7 +10,7 @@ import {
 // A balance is left and the order is not settled or refunded.
 export function isUnpaid(order: LocalOrder) {
   return (
-    order.remainingBalanceThb > 0 &&
+    order.remainingBalance > 0 &&
     order.paymentStatus !== "fully_paid" &&
     order.paymentStatus !== "refunded"
   )

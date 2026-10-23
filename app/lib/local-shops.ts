@@ -1,7 +1,7 @@
 export type LocalShopProduct = {
   id: string
   name: string
-  priceThb: number
+  price: number
   note: string // variants such as color and size
   imagePath?: string // file in the Supabase "photos" bucket
   updatedAt?: string

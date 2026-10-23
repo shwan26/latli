@@ -48,7 +48,7 @@ import {
 import { listOrders, updateOrdersCustomer } from "@/lib/db/orders"
 import { messageOf } from "@/lib/db/shared"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { formatMoney } from "../../lib/currency"
+import { formatAmount, formatMoney } from "../../lib/currency"
 import { useI18n } from "@/lib/i18n/provider"
 import { dateLocale, translate } from "@/lib/i18n/runtime"
 
@@ -400,9 +400,9 @@ export default function CustomerDetailsPage() {
             <div className="grid grid-cols-2 gap-3">
               <AmountBox
                 label={t("Total")}
-                value={formatMoney(summary.totalThb, summary.baseCurrency)}
+                value={formatAmount(summary.total)}
               />
-              {summary.customerCurrency !== summary.baseCurrency ? (
+              {summary.customerCurrency ? (
                 <AmountBox
                   label={summary.customerCurrency}
                   value={formatMoney(summary.totalMmk, summary.customerCurrency)}
@@ -410,7 +410,7 @@ export default function CustomerDetailsPage() {
               ) : null}
               <AmountBox
                 label={t("Unpaid")}
-                value={formatMoney(summary.unpaidThb, summary.baseCurrency)}
+                value={formatAmount(summary.unpaid)}
               />
               <AmountBox
                 label={t("Orders")}
@@ -515,7 +515,7 @@ function CustomerOrderRow({ order }: { order: LocalOrder }) {
             </div>
 
             <p className="shrink-0 text-sm font-semibold">
-              {formatMoney(order.totalCustomerPayableThb, order.baseCurrency)}
+              {formatAmount(order.totalCustomerPayable)}
             </p>
           </div>
 

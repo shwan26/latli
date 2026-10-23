@@ -105,8 +105,8 @@ const FIELD_ORDER = [
   "productName",
   "productSize",
   "quantity",
-  "costPriceThb",
-  "sellingPriceThb",
+  "costPrice",
+  "sellingPrice",
   "exchangeRate",
 ]
 
@@ -123,7 +123,7 @@ type ExtractedOrder = {
   productSize: string
   productColor: string
   quantity: number
-  sellingPriceThb: number
+  sellingPrice: number
   customerMessage: string
 }
 
@@ -235,13 +235,13 @@ export default function CreateOrderPage() {
   const [productSize, setProductSize] = useState("")
   const [productColor, setProductColor] = useState("")
   const [quantity, setQuantity] = useState("1")
-  const [costPriceThb, setCostPriceThb] = useState("")
-  const [sellingPriceThb, setSellingPriceThb] = useState("")
+  const [costPrice, setCostPrice] = useState("")
+  const [sellingPrice, setSellingPrice] = useState("")
   const [customerMessage, setCustomerMessage] = useState("")
 
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("not_paid")
   const [orderStatus, setOrderStatus] = useState<OrderStatus>("not_bought")
-  const [amountPaidThb, setAmountPaidThb] = useState("")
+  const [amountPaid, setAmountPaid] = useState("")
 
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null)
   const [saveScreenshot, setSaveScreenshot] = useState(false)
@@ -394,9 +394,9 @@ export default function CreateOrderPage() {
       }
     }
     if (data.quantity > 1) setQuantity(String(data.quantity))
-    setSellingPriceThb(
+    setSellingPrice(
       (value) =>
-        value || (data.sellingPriceThb ? String(data.sellingPriceThb) : "")
+        value || (data.sellingPrice ? String(data.sellingPrice) : "")
     )
 
     const match = findMatchingCustomer(customers, {
@@ -513,7 +513,7 @@ export default function CreateOrderPage() {
         productSize: ocr.productSize,
         productColor: ocr.productColor,
         quantity: 1,
-        sellingPriceThb: 0,
+        sellingPrice: 0,
         customerMessage: ocr.customerMessage,
       }
 
@@ -634,8 +634,8 @@ export default function CreateOrderPage() {
     setSelectedProductId(product.id)
     setProductName(product.name)
     setProductSize(product.note)
-    setCostPriceThb(product.priceThb ? String(product.priceThb) : "")
-    clearFieldError("productName", "productSize", "costPriceThb")
+    setCostPrice(product.price ? String(product.price) : "")
+    clearFieldError("productName", "productSize", "costPrice")
     setProductPhotoFile(null)
     setProductPhotoPreview("")
 
@@ -665,8 +665,8 @@ export default function CreateOrderPage() {
     const trimmedColor = productColor.trim()
     const trimmedProductName = productName.trim()
     const quantityNumber = Number(quantity.trim())
-    const costPriceNumber = toNumber(costPriceThb)
-    const sellingPriceNumber = toNumber(sellingPriceThb)
+    const costPriceNumber = toNumber(costPrice)
+    const sellingPriceNumber = toNumber(sellingPrice)
 
     // Check every required field at once, so all problems show together.
     const problems: Record<string, string> = {}
@@ -692,16 +692,16 @@ export default function CreateOrderPage() {
       problems.quantity = t("Quantity must be at least 1")
     }
 
-    if (costPriceThb.trim() === "" || !(Number(costPriceThb) >= 0)) {
-      problems.costPriceThb = t("Enter the cost price")
+    if (costPrice.trim() === "" || !(Number(costPrice) >= 0)) {
+      problems.costPrice = t("Enter the cost price")
     }
 
     if (secondCurrency && !(Number(exchangeRate) > 0)) {
       problems.exchangeRate = t("Enter an exchange rate greater than 0")
     }
 
-    if (sellingPriceThb.trim() === "" || !(Number(sellingPriceThb) > 0)) {
-      problems.sellingPriceThb = t("Enter a selling price above 0")
+    if (sellingPrice.trim() === "" || !(Number(sellingPrice) > 0)) {
+      problems.sellingPrice = t("Enter a selling price above 0")
     }
 
     setFieldErrors(problems)
@@ -820,19 +820,19 @@ export default function CreateOrderPage() {
         }
       }
 
-      const totalRetailerCostThb = costPriceNumber * quantityNumber
-      const totalCustomerPayableThb = sellingPriceNumber * quantityNumber
+      const totalRetailerCost = costPriceNumber * quantityNumber
+      const totalCustomerPayable = sellingPriceNumber * quantityNumber
 
-      const totalPaidThb =
+      const totalPaid =
         paymentStatus === "fully_paid" || paymentStatus === "refunded"
-          ? totalCustomerPayableThb
+          ? totalCustomerPayable
           : paymentStatus === "partially_paid"
-            ? Math.min(toNumber(amountPaidThb), totalCustomerPayableThb)
+            ? Math.min(toNumber(amountPaid), totalCustomerPayable)
             : 0
-      const remainingBalanceThb =
+      const remainingBalance =
         paymentStatus === "refunded"
           ? 0
-          : Math.max(totalCustomerPayableThb - totalPaidThb, 0)
+          : Math.max(totalCustomerPayable - totalPaid, 0)
 
       // The order number and dates are set by the database.
       await insertOrder({
@@ -841,15 +841,14 @@ export default function CreateOrderPage() {
         orderStatus,
         paymentStatus,
 
-        baseCurrency,
         customerCurrency: secondCurrency ?? baseCurrency,
-        exchangeRateThbToMmk: secondCurrency ? toNumber(exchangeRate) : 1,
+        exchangeRate: secondCurrency ? toNumber(exchangeRate) : 1,
 
-        totalRetailerCostThb,
-        totalCustomerPayableThb,
-        totalPaidThb,
-        remainingBalanceThb,
-        profitThb: totalCustomerPayableThb - totalRetailerCostThb,
+        totalRetailerCost,
+        totalCustomerPayable,
+        totalPaid,
+        remainingBalance,
+        profit: totalCustomerPayable - totalRetailerCost,
 
         facebookName: customer.facebookName,
         phone: customer.phone,
@@ -865,8 +864,8 @@ export default function CreateOrderPage() {
         productDescription: "",
         productNote: "",
         retailerName: shopName,
-        retailerUnitPriceThb: costPriceNumber,
-        sellingUnitPriceThb: sellingPriceNumber,
+        retailerUnitPrice: costPriceNumber,
+        sellingUnitPrice: sellingPriceNumber,
         productPhotoName: productPhotoFile?.name ?? "",
         productPhotoPath,
         orderScreenshotPath,
@@ -900,7 +899,7 @@ export default function CreateOrderPage() {
       if (shopId && isNewProduct) {
         await insertProduct(shopId, {
           name: trimmedProductName,
-          priceThb: costPriceNumber,
+          price: costPriceNumber,
           note: trimmedSize,
           imagePath: productImagePath,
         })
@@ -1321,35 +1320,35 @@ export default function CreateOrderPage() {
               error={fieldErrors.quantity}
               />
               <TextField
-                id="costPriceThb"
-                label={t("Cost price (฿)").replace("฿", baseCurrency)}
+                id="costPrice"
+                label={t("Cost price")}
                 type="number"
                 inputMode="decimal"
                 min="0"
-                value={costPriceThb}
+                value={costPrice}
                 onChange={(value) => {
-                setCostPriceThb(value)
-                clearFieldError("costPriceThb")
+                setCostPrice(value)
+                clearFieldError("costPrice")
               }}
               required
-              error={fieldErrors.costPriceThb}
+              error={fieldErrors.costPrice}
                 placeholder="0"
               />
             </div>
 
             <TextField
-              id="sellingPriceThb"
-              label={t("Selling price (฿)").replace("฿", baseCurrency)}
+              id="sellingPrice"
+              label={t("Selling price")}
               type="number"
               inputMode="decimal"
               min="0"
-              value={sellingPriceThb}
+              value={sellingPrice}
               onChange={(value) => {
-                setSellingPriceThb(value)
-                clearFieldError("sellingPriceThb")
+                setSellingPrice(value)
+                clearFieldError("sellingPrice")
               }}
               required
-              error={fieldErrors.sellingPriceThb}
+              error={fieldErrors.sellingPrice}
               placeholder="0"
             />
 
@@ -1437,13 +1436,13 @@ export default function CreateOrderPage() {
 
             {paymentStatus === "partially_paid" ? (
               <TextField
-                id="amountPaidThb"
-                label={t("Amount paid so far (฿)").replace("฿", baseCurrency)}
+                id="amountPaid"
+                label={t("Amount paid so far")}
                 type="number"
                 inputMode="decimal"
                 min="0"
-                value={amountPaidThb}
-                onChange={setAmountPaidThb}
+                value={amountPaid}
+                onChange={setAmountPaid}
                 placeholder="0"
               />
             ) : null}

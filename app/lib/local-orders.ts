@@ -45,17 +45,17 @@ export type LocalOrder = {
   orderStatus: OrderStatus
   paymentStatus: PaymentStatus
 
-  // The *Thb money fields below are legacy names: they hold amounts in
-  // baseCurrency. exchangeRateThbToMmk means 1 baseCurrency = N customerCurrency.
-  baseCurrency: Currency
+  // Amounts are plain numbers in the account's primary currency (profile).
+  // customerCurrency and exchangeRate only matter when the order has a second
+  // currency: exchangeRate means 1 primary currency = N customerCurrency.
   customerCurrency: Currency
-  exchangeRateThbToMmk: number
+  exchangeRate: number
 
-  totalRetailerCostThb: number
-  totalCustomerPayableThb: number
-  totalPaidThb: number
-  remainingBalanceThb: number
-  profitThb: number
+  totalRetailerCost: number
+  totalCustomerPayable: number
+  totalPaid: number
+  remainingBalance: number
+  profit: number
 
   createdAt: string
   updatedAt?: string
@@ -82,6 +82,6 @@ export type LocalOrder = {
   retailerName?: string
   cargoName?: string
 
-  retailerUnitPriceThb?: number
-  sellingUnitPriceThb?: number
+  retailerUnitPrice?: number
+  sellingUnitPrice?: number
 }

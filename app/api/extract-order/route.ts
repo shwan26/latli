@@ -37,7 +37,7 @@ Extract the order details. Rules:
 - productSize: the size or variant, such as "M", "42" or "XL".
 - productColor: the colour.
 - quantity: the number of items. Use 1 when it is not stated.
-- sellingPriceThb: a price in Thai baht only if the chat states one.
+- sellingPrice: a price in Thai baht only if the chat states one.
 - customerMessage: the customer's most relevant messages about the order, copied in their original language, at most 3 short lines.`
 
 const STRING = { type: "STRING" }
@@ -55,7 +55,7 @@ const RESPONSE_SCHEMA = {
     productSize: STRING,
     productColor: STRING,
     quantity: { type: "INTEGER" },
-    sellingPriceThb: { type: "NUMBER" },
+    sellingPrice: { type: "NUMBER" },
     customerMessage: STRING,
   },
   required: [
@@ -69,7 +69,7 @@ const RESPONSE_SCHEMA = {
     "productSize",
     "productColor",
     "quantity",
-    "sellingPriceThb",
+    "sellingPrice",
     "customerMessage",
   ],
 }
@@ -233,9 +233,9 @@ export async function POST(request: Request) {
     }
 
     data.quantity = Number.isInteger(parsed?.quantity) && parsed.quantity > 0 ? parsed.quantity : 1
-    data.sellingPriceThb =
-      typeof parsed?.sellingPriceThb === "number" && parsed.sellingPriceThb > 0
-        ? parsed.sellingPriceThb
+    data.sellingPrice =
+      typeof parsed?.sellingPrice === "number" && parsed.sellingPrice > 0
+        ? parsed.sellingPrice
         : 0
 
     return Response.json({

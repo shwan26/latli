@@ -139,7 +139,7 @@ export default function DashboardPage() {
         orders: 0,
       }
 
-      customer.sales += order.totalCustomerPayableThb
+      customer.sales += order.totalCustomerPayable
       customer.orders += 1
       customers.set(customerKey, customer)
 
@@ -154,7 +154,7 @@ export default function DashboardPage() {
         }
 
         product.units += order.quantity ?? 1
-        product.sales += order.totalCustomerPayableThb
+        product.sales += order.totalCustomerPayable
         products.set(productKey, product)
       }
     }

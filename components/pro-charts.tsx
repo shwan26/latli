@@ -116,8 +116,8 @@ export function ProCharts({ orders, currency }: Props) {
         profit: 0,
         sort: date.getTime(),
       }
-      current.sales += order.totalCustomerPayableThb
-      current.profit += order.profitThb
+      current.sales += order.totalCustomerPayable
+      current.profit += order.profit
       values.set(key, current)
     }
 
@@ -125,11 +125,11 @@ export function ProCharts({ orders, currency }: Props) {
   }, [activeOrders])
 
   const customers = useMemo(
-    () => aggregate(activeOrders, (order) => order.customerName, (order) => order.totalCustomerPayableThb),
+    () => aggregate(activeOrders, (order) => order.customerName, (order) => order.totalCustomerPayable),
     [activeOrders]
   )
   const shops = useMemo(
-    () => aggregate(activeOrders, (order) => order.retailerName ?? "", (order) => order.totalCustomerPayableThb),
+    () => aggregate(activeOrders, (order) => order.retailerName ?? "", (order) => order.totalCustomerPayable),
     [activeOrders]
   )
   const completeProducts = useMemo(
@@ -157,7 +157,7 @@ export function ProCharts({ orders, currency }: Props) {
       aggregate(
         orders.filter((order) => order.paymentStatus === "refunded"),
         (order) => order.productName ?? "",
-        (order) => order.totalPaidThb
+        (order) => order.totalPaid
       ),
     [orders]
   )

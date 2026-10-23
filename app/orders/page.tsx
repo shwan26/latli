@@ -22,7 +22,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-import { formatMoney, getOrderRate } from "../lib/currency"
+import {
+  formatAmount,
+  formatMoney,
+  getOrderRate,
+  hasSecondCurrency,
+} from "../lib/currency"
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUSES,
@@ -401,12 +406,12 @@ function OrderRow({ order }: { order: LocalOrder }) {
 
           <div className="shrink-0 text-right">
             <p className="font-semibold">
-              {formatMoney(order.totalCustomerPayableThb, order.baseCurrency)}
+              {formatAmount(order.totalCustomerPayable)}
             </p>
-            {order.customerCurrency !== order.baseCurrency ? (
+            {hasSecondCurrency(order) ? (
               <p className="text-[11px] text-muted-foreground">
                 {formatMoney(
-                  order.totalCustomerPayableThb * getOrderRate(order),
+                  order.totalCustomerPayable * getOrderRate(order),
                   order.customerCurrency
                 )}
               </p>

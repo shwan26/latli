@@ -1,4 +1,4 @@
-import { getOrderRate } from "./currency"
+import { getOrderRate, hasSecondCurrency } from "./currency"
 import type { Currency } from "./local-orders"
 import type { LocalOrder } from "./local-orders"
 
@@ -30,13 +30,12 @@ export type CustomerSummary = {
   otherContacts: string
   saved: boolean
   orderCount: number
-  totalThb: number
+  total: number
   totalMmk: number
-  unpaidThb: number
-  // Currencies of the customer's latest order. totalThb and unpaidThb are in
-  // baseCurrency, totalMmk is in customerCurrency (legacy field names).
-  baseCurrency: Currency
-  customerCurrency: Currency
+  unpaid: number
+  // total and unpaid are plain amounts in the primary currency. totalMmk is in
+  // customerCurrency, which is null when the latest order has no second currency.
+  customerCurrency: Currency | null
   lastOrderAt: string
   createdAt: string
 }
@@ -87,11 +86,10 @@ export function buildCustomerSummaries(
       otherContacts: customer.otherContacts,
       saved: true,
       orderCount: 0,
-      totalThb: 0,
+      total: 0,
       totalMmk: 0,
-      unpaidThb: 0,
-      baseCurrency: "THB",
-      customerCurrency: "MMK",
+      unpaid: 0,
+      customerCurrency: null,
       lastOrderAt: "",
       createdAt: customer.createdAt,
     })
@@ -111,23 +109,23 @@ export function buildCustomerSummaries(
         otherContacts: "",
         saved: false,
         orderCount: 0,
-        totalThb: 0,
+        total: 0,
         totalMmk: 0,
-        unpaidThb: 0,
-        baseCurrency: "THB",
-        customerCurrency: "MMK",
+        unpaid: 0,
+        customerCurrency: null,
         lastOrderAt: "",
         createdAt: order.createdAt,
       } satisfies CustomerSummary)
 
-    const totalThb = order.totalCustomerPayableThb || 0
+    const total = order.totalCustomerPayable || 0
 
     summary.orderCount += 1
-    summary.totalThb += totalThb
-    summary.totalMmk += totalThb * getOrderRate(order)
-    summary.unpaidThb += order.remainingBalanceThb || 0
-    summary.baseCurrency = order.baseCurrency
-    summary.customerCurrency = order.customerCurrency
+    summary.total += total
+    summary.totalMmk += total * getOrderRate(order)
+    summary.unpaid += order.remainingBalance || 0
+    summary.customerCurrency = hasSecondCurrency(order)
+      ? order.customerCurrency
+      : null
 
     if (
       !summary.lastOrderAt ||
@@ -146,7 +144,7 @@ export function buildCustomerSummaries(
   }
 
   return Array.from(summaries.values()).sort(
-    (a, b) => b.totalThb - a.totalThb || a.name.localeCompare(b.name)
+    (a, b) => b.total - a.total || a.name.localeCompare(b.name)
   )
 }
 

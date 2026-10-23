@@ -52,7 +52,7 @@ import {
   type LocalShopProduct,
 } from "../lib/local-shops"
 import { resizeImageToDataUrl } from "../lib/image-resize"
-import { formatMoney } from "../lib/currency"
+import { formatAmount } from "../lib/currency"
 import {
   getPhotoExpiry,
   getPhotoUrls,
@@ -79,14 +79,14 @@ type ShopDraft = typeof emptyShopDraft
 
 type ProductDraft = {
   name: string
-  priceThb: string
+  price: string
   note: string
   imageDataUrl: string
 }
 
 const emptyProductDraft: ProductDraft = {
   name: "",
-  priceThb: "",
+  price: "",
   note: "",
   imageDataUrl: "",
 }
@@ -270,7 +270,7 @@ export default function ShopsPage() {
       try {
         product = await insertProduct(selectedShop.id, {
           name: productDraft.name.trim(),
-          priceThb: toNumber(productDraft.priceThb),
+          price: toNumber(productDraft.price),
           note: productDraft.note.trim(),
           imagePath,
         })
@@ -713,7 +713,7 @@ function ShopDetail({
                     </p>
                   ) : null}
                   <p className="mt-0.5 text-muted-foreground">
-                    {formatMoney(product.priceThb, account?.baseCurrency ?? "THB")}
+                    {formatAmount(product.price)}
                   </p>
                   {product.imagePath && photoExpiry[product.imagePath] ? (
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -759,9 +759,9 @@ function ShopDetail({
           />
           <TextInput
             id="productPrice"
-            label={t("Price THB")}
-            value={productDraft.priceThb}
-            onChange={(value) => onProductChange("priceThb", value)}
+            label={t("Price")}
+            value={productDraft.price}
+            onChange={(value) => onProductChange("price", value)}
             placeholder="0"
             type="number"
           />

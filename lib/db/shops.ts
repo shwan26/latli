@@ -6,7 +6,7 @@ import { check, fetchAllRows, getDb } from "./shared"
 type ProductRow = {
   id: string
   name: string
-  price_thb: number
+  price: number
   note: string
   image_path: string | null
   updated_at: string
@@ -35,7 +35,7 @@ export type ShopInput = {
 
 export type ProductInput = {
   name: string
-  priceThb: number
+  price: number
   note: string
   imagePath?: string
   createdAt?: string
@@ -45,7 +45,7 @@ function productFromRow(row: ProductRow): LocalShopProduct {
   return {
     id: row.id,
     name: row.name,
-    priceThb: Number(row.price_thb),
+    price: Number(row.price),
     note: row.note,
     imagePath: row.image_path ?? undefined,
     updatedAt: row.updated_at,
@@ -128,7 +128,7 @@ export async function insertProduct(shopId: string, product: ProductInput) {
     .insert({
       shop_id: shopId,
       name: product.name,
-      price_thb: product.priceThb,
+      price: product.price,
       note: product.note,
       image_path: product.imagePath ?? null,
       ...(product.createdAt ? { created_at: product.createdAt } : {}),

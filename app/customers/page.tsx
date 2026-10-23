@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { formatMoney } from "../lib/currency"
+import { formatAmount } from "../lib/currency"
 import {
   buildCustomerSummaries,
   type CustomerSummary,
@@ -100,7 +100,7 @@ export default function CustomersPage() {
           case "orders":
             return b.orderCount - a.orderCount || a.name.localeCompare(b.name)
           default:
-            return b.totalThb - a.totalThb || a.name.localeCompare(b.name)
+            return b.total - a.total || a.name.localeCompare(b.name)
         }
       })
   }, [summaries, search, sort])
@@ -215,7 +215,7 @@ function CustomerRow({ customer }: { customer: CustomerSummary }) {
             {t(customer.orderCount === 1 ? "{count} order" : "{count} orders", { count: customer.orderCount })}
           </p>
         </div>
-        <p className="shrink-0 font-semibold">{formatMoney(customer.totalThb, customer.baseCurrency)}</p>
+        <p className="shrink-0 font-semibold">{formatAmount(customer.total)}</p>
       </Link>
     </li>
   )

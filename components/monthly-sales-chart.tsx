@@ -78,10 +78,10 @@ export function MonthlySalesChart({ orders, currency, month }: Props) {
 
       const date = new Date(order.createdAt)
 
-      days[date.getDate() - 1].sales += order.totalCustomerPayableThb
-      days[date.getDate() - 1].profit += order.profitThb
-      total += order.totalCustomerPayableThb
-      totalProfit += order.profitThb
+      days[date.getDate() - 1].sales += order.totalCustomerPayable
+      days[date.getDate() - 1].profit += order.profit
+      total += order.totalCustomerPayable
+      totalProfit += order.profit
       monthOrders.push(order)
     }
 
@@ -108,8 +108,8 @@ export function MonthlySalesChart({ orders, currency, month }: Props) {
           order.customerName,
           order.orderStatus,
           order.paymentStatus,
-          Math.round(order.totalCustomerPayableThb),
-          Math.round(order.profitThb),
+          Math.round(order.totalCustomerPayable),
+          Math.round(order.profit),
         ]
       }),
       [],

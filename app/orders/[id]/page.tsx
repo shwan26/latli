@@ -73,7 +73,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
 import { messageOf } from "@/lib/db/shared"
 import { photoSizeFor, resizeImageToDataUrl } from "../../lib/image-resize"
-import { formatMoney } from "../../lib/currency"
+import { formatAmount } from "../../lib/currency"
 import { useI18n } from "@/lib/i18n/provider"
 import { dateLocale, translate } from "@/lib/i18n/runtime"
 import { RichText } from "@/components/rich-text"
@@ -89,8 +89,8 @@ const FIELD_ORDER = [
   "productName",
   "productSize",
   "quantity",
-  "costPriceThb",
-  "sellingPriceThb",
+  "costPrice",
+  "sellingPrice",
 ]
 
 export default function OrderDetailsPage() {
@@ -116,8 +116,8 @@ export default function OrderDetailsPage() {
   const [productColor, setProductColor] = useState("")
   const [productDescription, setProductDescription] = useState("")
   const [quantity, setQuantity] = useState("1")
-  const [costPriceThb, setCostPriceThb] = useState("0")
-  const [sellingPriceThb, setSellingPriceThb] = useState("0")
+  const [costPrice, setCostPrice] = useState("0")
+  const [sellingPrice, setSellingPrice] = useState("0")
   const [customerMessage, setCustomerMessage] = useState("")
   const [paymentStatus, setPaymentStatus] =
     useState<LocalOrder["paymentStatus"]>("not_paid")
@@ -166,8 +166,8 @@ export default function OrderDetailsPage() {
           setProductColor(storedOrder.productColor || "")
           setProductDescription(storedOrder.productDescription || "")
           setQuantity(String(storedOrder.quantity || 1))
-          setCostPriceThb(String(storedOrder.retailerUnitPriceThb || 0))
-          setSellingPriceThb(String(storedOrder.sellingUnitPriceThb || 0))
+          setCostPrice(String(storedOrder.retailerUnitPrice || 0))
+          setSellingPrice(String(storedOrder.sellingUnitPrice || 0))
           setCustomerMessage(storedOrder.customerMessageBurmese || "")
           setPaymentStatus(storedOrder.paymentStatus)
           setOrderStatus(storedOrder.orderStatus)
@@ -308,7 +308,7 @@ export default function OrderDetailsPage() {
     setSelectedProductId(product.id)
     setProductName(product.name)
     setProductSize(product.note)
-    setCostPriceThb(String(product.priceThb || 0))
+    setCostPrice(String(product.price || 0))
     setNewPhotoDataUrl("")
     setNewPhotoName("")
 
@@ -367,12 +367,12 @@ export default function OrderDetailsPage() {
       problems.quantity = t("Quantity must be at least 1")
     }
 
-    if (costPriceThb.trim() === "" || !(Number(costPriceThb) >= 0)) {
-      problems.costPriceThb = t("Enter the cost price")
+    if (costPrice.trim() === "" || !(Number(costPrice) >= 0)) {
+      problems.costPrice = t("Enter the cost price")
     }
 
-    if (sellingPriceThb.trim() === "" || !(Number(sellingPriceThb) > 0)) {
-      problems.sellingPriceThb = t("Enter a selling price above 0")
+    if (sellingPrice.trim() === "" || !(Number(sellingPrice) > 0)) {
+      problems.sellingPrice = t("Enter a selling price above 0")
     }
 
     setFieldErrors(problems)
@@ -440,18 +440,18 @@ export default function OrderDetailsPage() {
       )
 
     try {
-      const costPriceNumber = toNumber(costPriceThb)
-      const sellingPriceNumber = toNumber(sellingPriceThb)
-      const totalRetailerCostThb = costPriceNumber * quantityNumber
-      const totalCustomerPayableThb = sellingPriceNumber * quantityNumber
-      const totalPaidThb =
+      const costPriceNumber = toNumber(costPrice)
+      const sellingPriceNumber = toNumber(sellingPrice)
+      const totalRetailerCost = costPriceNumber * quantityNumber
+      const totalCustomerPayable = sellingPriceNumber * quantityNumber
+      const totalPaid =
         paymentStatus === "fully_paid"
-          ? totalCustomerPayableThb
+          ? totalCustomerPayable
           : paymentStatus === "not_paid"
             ? 0
-            : Math.min(order.totalPaidThb || 0, totalCustomerPayableThb)
-      const remainingBalanceThb = Math.max(
-        totalCustomerPayableThb - totalPaidThb,
+            : Math.min(order.totalPaid || 0, totalCustomerPayable)
+      const remainingBalance = Math.max(
+        totalCustomerPayable - totalPaid,
         0
       )
 
@@ -480,11 +480,11 @@ export default function OrderDetailsPage() {
         address: location.trim(),
         orderStatus,
         paymentStatus,
-        totalRetailerCostThb,
-        totalCustomerPayableThb,
-        totalPaidThb,
-        remainingBalanceThb,
-        profitThb: totalCustomerPayableThb - totalRetailerCostThb,
+        totalRetailerCost,
+        totalCustomerPayable,
+        totalPaid,
+        remainingBalance,
+        profit: totalCustomerPayable - totalRetailerCost,
         customerMessageBurmese: customerMessage.trim(),
         productName: productName.trim() || "Product photo order",
         quantity: quantityNumber,
@@ -493,8 +493,8 @@ export default function OrderDetailsPage() {
         productColor: productColor.trim(),
         productDescription: productDescription.trim(),
         productNote: productDescription.trim(),
-        retailerUnitPriceThb: costPriceNumber,
-        sellingUnitPriceThb: sellingPriceNumber,
+        retailerUnitPrice: costPriceNumber,
+        sellingUnitPrice: sellingPriceNumber,
         retailerName: shopName,
         cargoName: cargoName,
         productPhotoName: newPhotoDataUrl ? newPhotoName : order.productPhotoName,
@@ -516,7 +516,7 @@ export default function OrderDetailsPage() {
         if (shopId && linkProduct && productName.trim()) {
           await insertProduct(shopId, {
             name: productName.trim(),
-            priceThb: costPriceNumber,
+            price: costPriceNumber,
             note: trimmedSize,
             imagePath: productImagePath,
           })
@@ -867,29 +867,29 @@ export default function OrderDetailsPage() {
                 placeholder="1"
               />
               <TextInput
-                id="costPriceThb"
-                label={t("Cost price (฿)").replace("฿", order.baseCurrency)}
-                value={costPriceThb}
+                id="costPrice"
+                label={t("Cost price")}
+                value={costPrice}
                 onChange={(value) => {
-                setCostPriceThb(value)
-                clearFieldError("costPriceThb")
+                setCostPrice(value)
+                clearFieldError("costPrice")
               }}
               required
-              error={fieldErrors.costPriceThb}
+              error={fieldErrors.costPrice}
                 type="number"
                 placeholder="0"
               />
             </div>
             <TextInput
-              id="sellingPriceThb"
-              label={t("Selling price (฿)").replace("฿", order.baseCurrency)}
-              value={sellingPriceThb}
+              id="sellingPrice"
+              label={t("Selling price")}
+              value={sellingPrice}
               onChange={(value) => {
-                setSellingPriceThb(value)
-                clearFieldError("sellingPriceThb")
+                setSellingPrice(value)
+                clearFieldError("sellingPrice")
               }}
               required
-              error={fieldErrors.sellingPriceThb}
+              error={fieldErrors.sellingPrice}
               type="number"
               placeholder="0"
             />
@@ -897,17 +897,15 @@ export default function OrderDetailsPage() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <SummaryItem
                   label={t("Customer total")}
-                  value={formatMoney(
-                    toNumber(sellingPriceThb) * toNumber(quantity),
-                    order.baseCurrency
+                  value={formatAmount(
+                    toNumber(sellingPrice) * toNumber(quantity)
                   )}
                 />
                 <SummaryItem
                   label={t("Profit")}
-                  value={formatMoney(
-                    (toNumber(sellingPriceThb) - toNumber(costPriceThb)) *
-                      toNumber(quantity),
-                    order.baseCurrency
+                  value={formatAmount(
+                    (toNumber(sellingPrice) - toNumber(costPrice)) *
+                      toNumber(quantity)
                   )}
                 />
               </div>
