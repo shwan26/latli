@@ -1,7 +1,6 @@
-import { LEGAL } from "@/app/lib/legal"
-import { supportMailto } from "@/lib/support"
+import { supportMessenger } from "@/lib/support"
 
-// The support address as a link that starts an "Upgrade to Pro" email.
+// A link that opens the Latli Messenger conversation for a Pro upgrade.
 export function UpgradeLink({
   account,
 }: {
@@ -9,10 +8,12 @@ export function UpgradeLink({
 }) {
   return (
     <a
-      href={supportMailto("upgrade", account)}
+      href={supportMessenger("upgrade", account)}
       className="font-medium text-foreground underline"
+      target="_blank"
+      rel="noopener noreferrer"
     >
-      {LEGAL.contactEmail}
+      Message us on Messenger
     </a>
   )
 }

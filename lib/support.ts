@@ -1,4 +1,4 @@
-import { LEGAL } from "@/app/lib/legal"
+import { MESSENGER_URL } from "@/lib/site"
 
 type Account = {
   email?: string
@@ -6,36 +6,12 @@ type Account = {
   role?: string
 }
 
-function accountLines(account?: Account) {
-  if (!account?.email) return []
-
-  return [
-    "",
-    "--- Latli's Account (please keep this) ---",
-    `Email: ${account.email}`,
-    ...(account.plan ? [`Plan: ${account.plan}`] : []),
-    ...(account.role ? [`Role: ${account.role}`] : []),
-  ]
-}
-
-// A link that opens the user's email app with a message to support already
-// written. It is how people ask for Pro and raise a ticket.
-export function supportMailto(kind: "upgrade" | "ticket", account?: Account) {
-  const subject = kind === "upgrade" ? "Upgrade to Pro" : "Support ticket"
-
-  const lines =
+export function supportMessenger(kind: "upgrade" | "ticket", account?: Account) {
+  const baseUrl = MESSENGER_URL || "https://m.me/syovstudio"
+  const message =
     kind === "upgrade"
-      ? ["Hello, I would like to upgrade to the Pro plan of Latli.", ...accountLines(account)]
-      : [
-          "Hello, I need help with a support ticket for Latli.",
-          "",
-          "What you expected:",
-          "",
-          "Steps to see it:",
-          ...accountLines(account),
-        ]
+      ? `Hello, I would like to upgrade to Latli Pro.${account?.email ? ` My account email is ${account.email}.` : ""}`
+      : `Hello, I need help with Latli.${account?.email ? ` My account email is ${account.email}.` : ""}`
 
-  const body = lines.join("\r\n")
-
-  return `mailto:${LEGAL.contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  return `${baseUrl}?text=${encodeURIComponent(message)}`
 }

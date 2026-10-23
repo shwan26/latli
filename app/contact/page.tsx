@@ -3,7 +3,7 @@ import Link from "next/link"
 
 import { PublicFooter } from "@/components/public-footer"
 import { PublicNavbar } from "@/components/public-navbar"
-import { LEGAL } from "@/app/lib/legal"
+import { supportMessenger } from "@/lib/support"
 
 export const metadata: Metadata = {
   title: "Contact | Latli",
@@ -27,19 +27,21 @@ export default function ContactPage() {
           </p>
 
           <div className="rounded-lg border border-[#ded6c9] bg-[#fbfaf7] p-5">
-            <p className="text-sm text-[#605848]">Email</p>
+            <p className="text-sm text-[#605848]">Messenger</p>
             <a
-              href={`mailto:${LEGAL.contactEmail}`}
+              href={supportMessenger("ticket")}
               className="font-heading text-xl font-semibold underline underline-offset-4"
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              {LEGAL.contactEmail}
+              Message us on Messenger
             </a>
             <p className="mt-3 text-sm text-[#605848]">We usually reply within two working days.</p>
           </div>
 
           <h2 className="font-heading text-2xl font-semibold text-[#171512]">When you write</h2>
           <ul className="list-disc space-y-2 pl-6">
-            <li>Use the email address of your Latli account, so we can find it.</li>
+            <li>Include the email address of your Latli account, so we can find it.</li>
             <li>Tell us what you expected and the steps that led to the problem.</li>
             <li>Never send your password. We will never ask for it.</li>
           </ul>

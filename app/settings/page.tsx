@@ -30,7 +30,7 @@ import {
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
 import { UpgradeLink } from "@/components/upgrade-link"
-import { supportMailto } from "@/lib/support"
+import { supportMessenger } from "@/lib/support"
 import { useI18n } from "@/lib/i18n/provider"
 import { LanguageSelect } from "@/components/language-select"
 import { AccountDangerZone } from "@/components/account-danger-zone"
@@ -212,9 +212,11 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <SettingsLink
-              href={supportMailto("ticket", profile)}
+              href={supportMessenger("ticket", profile)}
+              target="_blank"
+              rel="noopener noreferrer"
               title={t("Raise a ticket")}
-              description={t("Email support with your account details filled in")}
+              description={t("Message us on Messenger for help")}
               icon={<IconLifebuoy className="size-5" />}
             />
             {profile.plan === "pro" ? null : (
@@ -251,11 +253,15 @@ export default function SettingsPage() {
 
 function SettingsLink({
   href,
+  target,
+  rel,
   title,
   description,
   icon,
 }: {
   href: string
+  target?: string
+  rel?: string
   title: string
   description: string
   icon: React.ReactNode
@@ -263,6 +269,8 @@ function SettingsLink({
   return (
     <Link
       href={href}
+      target={target}
+      rel={rel}
       className="flex min-h-16 w-full items-center gap-3 rounded-2xl border bg-background px-3 py-3 text-left"
     >
       <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">

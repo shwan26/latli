@@ -5,7 +5,7 @@ import { IconCheck, IconChevronDown, IconX } from "@tabler/icons-react"
 import { PublicNavbar } from "@/components/public-navbar"
 import { Button } from "@/components/ui/button"
 import { getI18n } from "@/lib/i18n/server"
-import { supportMailto } from "@/lib/support"
+import { supportMessenger } from "@/lib/support"
 
 // Edit by hand as founding seats are taken.
 const SPOTS_LEFT = 19
@@ -37,7 +37,7 @@ const FAQS = [
   {
     question: "How do I upgrade?",
     answer:
-      "Press Get Pro. It opens an email to us with your request. We reply, and switch on your Pro plan after we confirm",
+      "Press Get Pro to message us on Messenger. We reply, and switch on your Pro plan after we confirm",
   },
   {
     question: "What is the founding offer?",
@@ -185,7 +185,7 @@ export default async function PricingPage() {
                       asChild
                       className="h-11 w-full rounded-lg px-2 text-sm tracking-normal"
                     >
-                      <a href={supportMailto("upgrade")}>{t("Get Pro")}</a>
+                      <a href={supportMessenger("upgrade")} target="_blank" rel="noopener noreferrer">{t("Get Pro")}</a>
                     </Button>
                   </td>
                 </tr>

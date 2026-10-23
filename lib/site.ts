@@ -8,6 +8,9 @@ export const SITE_URL = (
 // example "latli.app"). Set NEXT_PUBLIC_FACEBOOK_PAGE; with none set, the
 // Messenger button is not shown.
 const FACEBOOK_PAGE = (process.env.NEXT_PUBLIC_FACEBOOK_PAGE ?? "").trim()
+  .replace(/^https?:\/\/(?:www\.)?m\.me\//i, "")
+  .replace(/^https?:\/\/(?:www\.)?facebook\.com\//i, "")
+  .replace(/\/$/, "")
 
 export const MESSENGER_URL = FACEBOOK_PAGE
   ? `https://m.me/${encodeURIComponent(FACEBOOK_PAGE)}`
