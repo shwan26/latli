@@ -22,12 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-import {
-  formatAmount,
-  formatMoney,
-  getOrderRate,
-  hasSecondCurrency,
-} from "../lib/currency"
+import { formatAmount } from "../lib/currency"
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUSES,
@@ -173,9 +168,7 @@ function OrdersContent() {
             order.facebookName,
             order.phone,
             order.productName,
-            order.productOption,
-            order.productColor,
-            order.productSize,
+            order.productVariant,
             order.retailerName,
           ]
             .filter(Boolean)
@@ -406,16 +399,8 @@ function OrderRow({ order }: { order: LocalOrder }) {
 
           <div className="shrink-0 text-right">
             <p className="font-semibold">
-              {formatAmount(order.totalCustomerPayable)}
+              {formatAmount(order.totalSellingPrice)}
             </p>
-            {hasSecondCurrency(order) ? (
-              <p className="text-[11px] text-muted-foreground">
-                {formatMoney(
-                  order.totalCustomerPayable * getOrderRate(order),
-                  order.customerCurrency
-                )}
-              </p>
-            ) : null}
             <Badge variant={STATUS_VARIANTS[order.orderStatus]} className="mt-1.5">
               {t(ORDER_STATUS_LABELS[order.orderStatus])}
             </Badge>

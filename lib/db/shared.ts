@@ -9,6 +9,14 @@ type DbError = { message: string } | null | undefined
 
 // Turns a Supabase error into a thrown Error with a readable message.
 export function check(error: DbError, action: string) {
+  // Orders point to customers, shops, products and cargo companies by id, so a
+  // row that orders still use cannot be deleted.
+  if (error && /violates foreign key constraint .* on table "orders"/.test(error.message)) {
+    throw new Error(
+      `${translate(action)}: ${translate("It is still used by orders. Change or delete those orders first")}`
+    )
+  }
+
   if (error) throw new Error(`${translate(action)}: ${translate(error.message)}`)
 }
 

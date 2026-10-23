@@ -25,7 +25,6 @@ import {
 import { Badge } from "@/components/ui/badge"
 
 import { type Currency, type LocalOrder } from "../lib/local-orders"
-import { getOrderCustomerKey } from "../lib/local-customers"
 import { listOrders } from "@/lib/db/orders"
 import { fetchProfile } from "@/lib/profile"
 import { createClient } from "@/lib/supabase/client"
@@ -131,7 +130,7 @@ export default function DashboardPage() {
     for (const order of orders) {
       if (!isSoldInMonth(order, month)) continue
 
-      const customerKey = getOrderCustomerKey(order)
+      const customerKey = order.customerId ?? order.id
       const customer = customers.get(customerKey) ?? {
         key: customerKey,
         name: order.customerName,
@@ -139,7 +138,7 @@ export default function DashboardPage() {
         orders: 0,
       }
 
-      customer.sales += order.totalCustomerPayable
+      customer.sales += order.totalSellingPrice
       customer.orders += 1
       customers.set(customerKey, customer)
 
@@ -154,7 +153,7 @@ export default function DashboardPage() {
         }
 
         product.units += order.quantity ?? 1
-        product.sales += order.totalCustomerPayable
+        product.sales += order.totalSellingPrice
         products.set(productKey, product)
       }
     }

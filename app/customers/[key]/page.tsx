@@ -36,7 +36,6 @@ import {
 import {
   buildCustomerSummaries,
   getCustomerKey,
-  getOrderCustomerKey,
   type LocalCustomer,
 } from "../../lib/local-customers"
 import {
@@ -45,10 +44,10 @@ import {
   listCustomers,
   updateCustomer,
 } from "@/lib/db/customers"
-import { listOrders, updateOrdersCustomer } from "@/lib/db/orders"
+import { listOrders } from "@/lib/db/orders"
 import { messageOf } from "@/lib/db/shared"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { formatAmount, formatMoney } from "../../lib/currency"
+import { formatAmount } from "../../lib/currency"
 import { useI18n } from "@/lib/i18n/provider"
 import { dateLocale, translate } from "@/lib/i18n/runtime"
 
@@ -145,7 +144,7 @@ export default function CustomerDetailsPage() {
   const customerOrders = useMemo(
     () =>
       orders
-        .filter((order) => getOrderCustomerKey(order) === customerKey)
+        .filter((order) => order.customerId === customerKey)
         .sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -181,9 +180,7 @@ export default function CustomerDetailsPage() {
 
     if (!summary) return
 
-    const existing = savedCustomers.find(
-      (customer) => getCustomerKey(customer) === summary.key
-    )
+    const existing = savedCustomers.find((customer) => customer.id === summary.key)
     const input = {
       name: draft.name.trim(),
       facebookName: draft.facebookName.trim(),
@@ -223,23 +220,11 @@ export default function CustomerDetailsPage() {
         : [...current, saved]
     )
 
-    // Orders are linked by phone, Facebook or name, so their copy of the
-    // customer details is updated too and they stay linked after the edit.
-    const orderIds = customerOrders.map((order) => order.id)
-
-    try {
-      await updateOrdersCustomer(orderIds, input)
-    } catch (error) {
-      setErrorMessage(
-        `${t("The customer was saved, but their orders were not updated")} ${messageOf(error, "")}`
-      )
-      setSaving(false)
-      return
-    }
-
+    // Orders link to the customer by id, so they show the new details without
+    // being rewritten. Only the copy kept in this page's state is refreshed.
     setOrders((current) =>
       current.map((order) =>
-        orderIds.includes(order.id)
+        order.customerId === saved.id
           ? {
               ...order,
               customerName: input.name,
@@ -252,18 +237,12 @@ export default function CustomerDetailsPage() {
     )
     setSaving(false)
     setEditing(false)
-
-    if (nextKey !== summary.key) {
-      router.replace(`/customers/${encodeURIComponent(nextKey)}`)
-    }
   }
 
   async function handleDelete() {
     if (!summary) return
 
-    const existing = savedCustomers.find(
-      (customer) => getCustomerKey(customer) === summary.key
-    )
+    const existing = savedCustomers.find((customer) => customer.id === summary.key)
 
     setConfirmingDelete(false)
 
@@ -336,18 +315,16 @@ export default function CustomerDetailsPage() {
             <IconPencil className="size-5" />
           </Button>
 
-          {summary.saved ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="rounded-xl text-destructive hover:text-destructive"
-              aria-label={t("Delete customer")}
-              onClick={() => setConfirmingDelete(true)}
-            >
-              <IconTrash className="size-5" />
-            </Button>
-          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="rounded-xl text-destructive hover:text-destructive"
+            aria-label={t("Delete customer")}
+            onClick={() => setConfirmingDelete(true)}
+          >
+            <IconTrash className="size-5" />
+          </Button>
         </div>
       </header>
 
@@ -402,15 +379,9 @@ export default function CustomerDetailsPage() {
                 label={t("Total")}
                 value={formatAmount(summary.total)}
               />
-              {summary.customerCurrency ? (
-                <AmountBox
-                  label={summary.customerCurrency}
-                  value={formatMoney(summary.totalMmk, summary.customerCurrency)}
-                />
-              ) : null}
               <AmountBox
                 label={t("Unpaid")}
-                value={formatAmount(summary.unpaid)}
+                value={`${summary.unpaid}`}
               />
               <AmountBox
                 label={t("Orders")}
@@ -444,9 +415,7 @@ export default function CustomerDetailsPage() {
           <SheetHeader className="border-b">
             <SheetTitle className="font-heading text-xl">{t("Edit Customer")}</SheetTitle>
             <SheetDescription>
-              {summary.saved
-                ? t("Saving also updates the details on this customer's orders")
-                : t("Saving adds this customer to your saved customers and updates the details on their orders")}
+              {t("Saving also updates the details on this customer's orders")}
             </SheetDescription>
           </SheetHeader>
 
@@ -507,15 +476,12 @@ function CustomerOrderRow({ order }: { order: LocalOrder }) {
               </h3>
               <p className="mt-1 truncate text-sm text-muted-foreground">
                 {t((order.quantity || 1) === 1 ? "{count} item" : "{count} items", { count: order.quantity || 1 })}
-                {order.productSize || order.productOption
-                  ? ` · Size ${order.productSize || order.productOption}`
-                  : ""}
-                {order.productColor ? ` · ${order.productColor}` : ""}
+                {order.productVariant ? ` · ${order.productVariant}` : ""}
               </p>
             </div>
 
             <p className="shrink-0 text-sm font-semibold">
-              {formatAmount(order.totalCustomerPayable)}
+              {formatAmount(order.totalSellingPrice)}
             </p>
           </div>
 

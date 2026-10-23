@@ -23,14 +23,9 @@ export function formatAmount(value: number) {
   return Math.round(value || 0).toLocaleString("en-US")
 }
 
-// 1 primary currency = this many second currency. A rate of 1 means the order
-// has no second currency.
-export function getOrderRate(order: LocalOrder) {
-  return order.exchangeRate || 1
-}
-
-export function hasSecondCurrency(order: LocalOrder) {
-  return getOrderRate(order) !== 1
+// Profit is never stored: what the customer pays minus what the shop charges.
+export function getProfit(order: LocalOrder) {
+  return order.totalSellingPrice - order.totalRetailerPrice
 }
 
 export function toNumber(value: string) {

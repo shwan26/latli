@@ -51,6 +51,8 @@ import {
 } from "../../lib/local-orders"
 import { deleteOrder, getOrder, updateOrder } from "@/lib/db/orders"
 import { listCargo } from "@/lib/db/cargo"
+import { insertCustomer, listCustomers, updateCustomer } from "@/lib/db/customers"
+import { getCustomerKey, type LocalCustomer } from "../../lib/local-customers"
 import { insertProduct, insertShop, listShops } from "@/lib/db/shops"
 import { OrderProductFields, type ProductMode } from "@/components/order-product-fields"
 import { SearchPicker } from "@/components/search-picker"
@@ -113,8 +115,8 @@ export default function OrderDetailsPage() {
   const [location, setLocation] = useState("")
   const [productName, setProductName] = useState("")
   const [productSize, setProductSize] = useState("")
+  const [productVariant, setProductVariant] = useState("")
   const [productColor, setProductColor] = useState("")
-  const [productDescription, setProductDescription] = useState("")
   const [quantity, setQuantity] = useState("1")
   const [costPrice, setCostPrice] = useState("0")
   const [sellingPrice, setSellingPrice] = useState("0")
@@ -130,6 +132,7 @@ export default function OrderDetailsPage() {
   const [savedPhotoUrl, setSavedPhotoUrl] = useState("")
   const [savedScreenshotUrl, setSavedScreenshotUrl] = useState("")
   const [shops, setShops] = useState<LocalShop[]>([])
+  const [customers, setCustomers] = useState<LocalCustomer[]>([])
   const [cargoCompanies, setCargoCompanies] = useState<LocalCargoCompany[]>([])
   const [selectedCargoId, setSelectedCargoId] = useState("")
   const [cargoCleared, setCargoCleared] = useState(false)
@@ -143,6 +146,17 @@ export default function OrderDetailsPage() {
   const [photoExpiresAt, setPhotoExpiresAt] = useState("")
   const [isPro, setIsPro] = useState(false)
   const photo = photoSizeFor(isPro)
+  // A product of the chosen shop with this name: its price is changed on the
+  // product, not on the order.
+  const priceLockedProduct = (
+    shopMode === "existing"
+      ? (shops.find((shop) => shop.id === selectedShopId)?.products ?? [])
+      : []
+  ).find(
+    (product) =>
+      product.name.trim().toLowerCase() === productName.trim().toLowerCase()
+  )
+  const priceLocked = !!priceLockedProduct
   const [account, setAccount] = useState<ProfileSettings | null>(null)
 
   useEffect(() => {
@@ -162,17 +176,24 @@ export default function OrderDetailsPage() {
           setPhone(storedOrder.phone || "")
           setLocation(storedOrder.address || "")
           setProductName(storedOrder.productName || "")
-          setProductSize(storedOrder.productSize || "")
-          setProductColor(storedOrder.productColor || "")
-          setProductDescription(storedOrder.productDescription || "")
+          setProductSize(storedOrder.productDetails?.size || "")
+          setProductVariant(storedOrder.productDetails?.variant || "")
+          setProductColor(storedOrder.productDetails?.color || "")
           setQuantity(String(storedOrder.quantity || 1))
-          setCostPrice(String(storedOrder.retailerUnitPrice || 0))
-          setSellingPrice(String(storedOrder.sellingUnitPrice || 0))
+          // The price per item this order was made with.
+          setCostPrice(
+            String(
+              storedOrder.quantity
+                ? storedOrder.totalRetailerPrice / storedOrder.quantity
+                : 0
+            )
+          )
+          setSellingPrice(String(storedOrder.totalSellingPrice || 0))
           setCustomerMessage(storedOrder.customerMessageBurmese || "")
           setPaymentStatus(storedOrder.paymentStatus)
           setOrderStatus(storedOrder.orderStatus)
 
-          const [urls, expiry, profile, loadedShops, loadedCargo] = await Promise.all([
+          const [urls, expiry, profile, loadedShops, loadedCargo, loadedCustomers] = await Promise.all([
             getPhotoUrls([
               storedOrder.productPhotoPath,
               storedOrder.orderScreenshotPath,
@@ -184,32 +205,23 @@ export default function OrderDetailsPage() {
             isSupabaseConfigured ? fetchProfile(createClient()) : null,
             listShops(),
             listCargo(),
+            listCustomers(),
           ])
 
           if (cancelled) return
 
-          const orderShop = storedOrder.retailerName?.trim().toLowerCase()
-          const matched = loadedShops.find(
-            (shop) => shop.name.trim().toLowerCase() === orderShop
-          )
-
           setShops(loadedShops)
           setCargoCompanies(loadedCargo)
+          setCustomers(loadedCustomers)
+          setSelectedCargoId(storedOrder.cargoId ?? "")
 
-          const orderCargo = storedOrder.cargoName?.trim().toLowerCase()
-
-          setSelectedCargoId(
-            loadedCargo.find(
-              (company) => company.name.trim().toLowerCase() === orderCargo
-            )?.id ?? ""
-          )
-
-          if (matched) {
-            setSelectedShopId(matched.id)
-          } else if (storedOrder.retailerName?.trim() || loadedShops.length === 0) {
+          if (storedOrder.shopId) {
+            setSelectedShopId(storedOrder.shopId)
+          } else if (loadedShops.length === 0) {
             setShopMode("new")
-            setNewShopName(storedOrder.retailerName?.trim() ?? "")
           }
+
+          if (storedOrder.productId) setSelectedProductId(storedOrder.productId)
 
           if (storedOrder.productPhotoPath) {
             setSavedPhotoUrl(urls[storedOrder.productPhotoPath] ?? "")
@@ -307,7 +319,9 @@ export default function OrderDetailsPage() {
   async function pickProduct(product: LocalShopProduct) {
     setSelectedProductId(product.id)
     setProductName(product.name)
-    setProductSize(product.note)
+    setProductSize(product.size)
+    setProductVariant(product.variant)
+    setProductColor(product.color)
     setCostPrice(String(product.price || 0))
     setNewPhotoDataUrl("")
     setNewPhotoName("")
@@ -354,6 +368,8 @@ export default function OrderDetailsPage() {
     }
 
     const trimmedSize = productSize.trim()
+    const trimmedVariant = productVariant.trim()
+    const trimmedColor = productColor.trim()
     const quantityNumber = Number(quantity.trim())
 
     // Check every required field at once, so all problems show together.
@@ -361,7 +377,6 @@ export default function OrderDetailsPage() {
 
     if (!customerName.trim()) problems.customerName = t("Enter the customer's name")
     if (!productName.trim()) problems.productName = t("Enter the product name")
-    if (!trimmedSize) problems.productSize = t("Enter the size or variant")
 
     if (!quantity.trim() || !Number.isInteger(quantityNumber) || quantityNumber < 1) {
       problems.quantity = t("Quantity must be at least 1")
@@ -372,7 +387,7 @@ export default function OrderDetailsPage() {
     }
 
     if (sellingPrice.trim() === "" || !(Number(sellingPrice) > 0)) {
-      problems.sellingPrice = t("Enter a selling price above 0")
+      problems.sellingPrice = t("Enter a total selling price above 0")
     }
 
     setFieldErrors(problems)
@@ -383,12 +398,7 @@ export default function OrderDetailsPage() {
       return
     }
 
-    // A cargo name that is no longer in the cargo list is kept as it was.
-    const cargoName = selectedCargoId
-      ? (cargoCompanies.find((company) => company.id === selectedCargoId)?.name ?? "")
-      : cargoCleared
-        ? ""
-        : (order.cargoName ?? "")
+    const cargoId = selectedCargoId || (cargoCleared ? undefined : order.cargoId)
 
     setSaving(true)
 
@@ -399,24 +409,19 @@ export default function OrderDetailsPage() {
     let productImagePath: string | undefined
 
     // Shop: a saved one, or a typed name (saved to the shop list if new).
-    let shopName = ""
     let shopId = ""
     let newShop: { name: string; phone: string; location: string } | null = null
 
     if (shopMode === "existing") {
-      const chosen = shops.find((shop) => shop.id === selectedShopId)
-
-      shopName = chosen?.name ?? ""
-      shopId = chosen?.id ?? ""
+      shopId = shops.find((shop) => shop.id === selectedShopId)?.id ?? ""
     } else if (newShopName.trim()) {
-      shopName = newShopName.trim()
+      const shopName = newShopName.trim()
 
       const sameName = shops.find(
         (shop) => shop.name.trim().toLowerCase() === shopName.toLowerCase()
       )
 
       if (sameName) {
-        shopName = sameName.name
         shopId = sameName.id
       } else {
         newShop = {
@@ -427,33 +432,26 @@ export default function OrderDetailsPage() {
       }
     }
 
+    // The order points to a product of its shop. A product with this name is
+    // reused; otherwise a new one is created below.
     const shopProducts = shops.find((shop) => shop.id === shopId)?.products ?? []
-    const productChanged =
-      newShop !== null ||
-      newPhotoDataUrl !== "" ||
-      productName.trim() !== (order.productName ?? "")
-    const linkProduct =
-      productChanged &&
-      !shopProducts.some(
-        (product) =>
-          product.name.trim().toLowerCase() === productName.trim().toLowerCase()
-      )
+    const sameNameProduct = shopProducts.find(
+      (product) =>
+        product.name.trim().toLowerCase() === productName.trim().toLowerCase()
+    )
+    let productId = sameNameProduct?.id
+    const linkProduct = !productId && productName.trim() !== ""
+    let productRowSaved = false
 
     try {
       const costPriceNumber = toNumber(costPrice)
       const sellingPriceNumber = toNumber(sellingPrice)
-      const totalRetailerCost = costPriceNumber * quantityNumber
-      const totalCustomerPayable = sellingPriceNumber * quantityNumber
-      const totalPaid =
-        paymentStatus === "fully_paid"
-          ? totalCustomerPayable
-          : paymentStatus === "not_paid"
-            ? 0
-            : Math.min(order.totalPaid || 0, totalCustomerPayable)
-      const remainingBalance = Math.max(
-        totalCustomerPayable - totalPaid,
-        0
-      )
+      // A saved product keeps its own price. An unchanged order keeps the
+      // total it was made with, even if the product price changed since.
+      const totalRetailerPrice =
+        sameNameProduct?.id === order.productId && quantityNumber === order.quantity
+          ? order.totalRetailerPrice
+          : (sameNameProduct ? sameNameProduct.price : costPriceNumber) * quantityNumber
 
       if (newPhotoDataUrl) {
         productPhotoPath = await uploadPhoto(newPhotoDataUrl, "orders")
@@ -472,31 +470,75 @@ export default function OrderDetailsPage() {
         replacedPaths.push(order.orderScreenshotPath)
       }
 
-      const updatedOrder = await updateOrder({
-        ...order,
-        customerName: customerName.trim() || "Customer order",
+      // The customer details belong to the customer record, which every order
+      // of that customer shows. Editing them here edits the record.
+      const customerInput = {
+        name: customerName.trim() || "Customer order",
         facebookName: facebookName.trim(),
         phone: phone.trim(),
         address: location.trim(),
+        otherContacts:
+          customers.find((customer) => customer.id === order.customerId)
+            ?.otherContacts ?? "",
+      }
+      const customerKey = getCustomerKey(customerInput)
+      const savedCustomer = customers.find((customer) => customer.id === order.customerId)
+      let customerId = order.customerId
+
+      if (savedCustomer) {
+        const changed =
+          customerInput.name !== savedCustomer.name ||
+          customerInput.facebookName !== savedCustomer.facebookName ||
+          customerInput.phone !== savedCustomer.phone ||
+          customerInput.address !== savedCustomer.address
+
+        if (
+          changed &&
+          customers.some(
+            (customer) =>
+              customer.id !== savedCustomer.id &&
+              getCustomerKey(customer) === customerKey
+          )
+        ) {
+          throw new Error(t("Another customer already uses this phone, Facebook or name"))
+        }
+
+        if (changed) await updateCustomer(savedCustomer.id, customerInput)
+      } else {
+        customerId =
+          customers.find((customer) => getCustomerKey(customer) === customerKey)?.id ??
+          (await insertCustomer(customerInput)).id
+      }
+
+      if (newShop) {
+        shopId = (await insertShop({ ...newShop, ownerName: "", note: "" })).id
+      }
+
+      if (shopId && linkProduct) {
+        productId = (
+          await insertProduct(shopId, {
+            name: productName.trim(),
+            price: costPriceNumber,
+            size: trimmedSize,
+            variant: trimmedVariant,
+            color: trimmedColor,
+            imagePath: productImagePath,
+          })
+        ).id
+        productRowSaved = true
+      }
+
+      const updatedOrder = await updateOrder({
+        ...order,
+        customerId,
+        productId,
+        cargoId,
         orderStatus,
         paymentStatus,
-        totalRetailerCost,
-        totalCustomerPayable,
-        totalPaid,
-        remainingBalance,
-        profit: totalCustomerPayable - totalRetailerCost,
-        customerMessageBurmese: customerMessage.trim(),
-        productName: productName.trim() || "Product photo order",
         quantity: quantityNumber,
-        productSize: trimmedSize,
-        productOption: trimmedSize,
-        productColor: productColor.trim(),
-        productDescription: productDescription.trim(),
-        productNote: productDescription.trim(),
-        retailerUnitPrice: costPriceNumber,
-        sellingUnitPrice: sellingPriceNumber,
-        retailerName: shopName,
-        cargoName: cargoName,
+        totalRetailerPrice,
+        totalSellingPrice: sellingPriceNumber,
+        customerMessageBurmese: customerMessage.trim(),
         productPhotoName: newPhotoDataUrl ? newPhotoName : order.productPhotoName,
         productPhotoPath,
         orderScreenshotPath: screenshotPath,
@@ -505,30 +547,13 @@ export default function OrderDetailsPage() {
       // The replaced photos are no longer used.
       await removePhotos(replacedPaths)
 
-      // The order is saved. Saving the shop or product record is best effort.
-      try {
-        if (newShop) {
-          shopId = (
-            await insertShop({ ...newShop, ownerName: "", note: "" })
-          ).id
-        }
-
-        if (shopId && linkProduct && productName.trim()) {
-          await insertProduct(shopId, {
-            name: productName.trim(),
-            price: costPriceNumber,
-            note: trimmedSize,
-            imagePath: productImagePath,
-          })
-        }
-      } catch {
-        await removePhotos([productImagePath])
-      }
-
       setOrder(updatedOrder)
       router.push("/orders")
     } catch (saveError) {
-      await removePhotos(uploadedPaths)
+      // A product photo that now belongs to a saved product must stay.
+      await removePhotos(
+        uploadedPaths.filter((path) => !(productRowSaved && path === productImagePath))
+      )
       setError(messageOf(saveError, t("Could not save the order. Please try again")))
     } finally {
       setSaving(false)
@@ -821,35 +846,27 @@ export default function OrderDetailsPage() {
               error={fieldErrors.productName}
               placeholder={t("Product name")}
             />
-            <div className="space-y-2">
-              <Label htmlFor="productDescription">{t("Description")}</Label>
-              <Textarea
-                id="productDescription"
-                value={productDescription}
-                onChange={(event) => setProductDescription(event.target.value)}
-                placeholder={t("Product description")}
-                className="min-h-24 rounded-xl text-base"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <TextInput
                 id="productSize"
-                label={t("Size / variant")}
+                label={t("Size")}
                 value={productSize}
-                onChange={(value) => {
-                setProductSize(value)
-                clearFieldError("productSize")
-              }}
-              required
-              error={fieldErrors.productSize}
-                placeholder={t("XS, 42, L...")}
+                onChange={setProductSize}
+                placeholder="S, M, 42"
+              />
+              <TextInput
+                id="productVariant"
+                label={t("Variant")}
+                value={productVariant}
+                onChange={setProductVariant}
+                placeholder={t("Cotton, slim")}
               />
               <TextInput
                 id="productColor"
                 label={t("Color")}
                 value={productColor}
                 onChange={setProductColor}
-                placeholder={t("White, black...")}
+                placeholder={t("Black, White")}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -869,6 +886,7 @@ export default function OrderDetailsPage() {
               <TextInput
                 id="costPrice"
                 label={t("Cost price")}
+                disabled={priceLocked}
                 value={costPrice}
                 onChange={(value) => {
                 setCostPrice(value)
@@ -882,7 +900,7 @@ export default function OrderDetailsPage() {
             </div>
             <TextInput
               id="sellingPrice"
-              label={t("Selling price")}
+              label={t("Total selling price")}
               value={sellingPrice}
               onChange={(value) => {
                 setSellingPrice(value)
@@ -897,15 +915,16 @@ export default function OrderDetailsPage() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <SummaryItem
                   label={t("Customer total")}
-                  value={formatAmount(
-                    toNumber(sellingPrice) * toNumber(quantity)
-                  )}
+                  value={formatAmount(toNumber(sellingPrice))}
                 />
                 <SummaryItem
                   label={t("Profit")}
                   value={formatAmount(
-                    (toNumber(sellingPrice) - toNumber(costPrice)) *
-                      toNumber(quantity)
+                    toNumber(sellingPrice) -
+                      (priceLockedProduct
+                        ? priceLockedProduct.price
+                        : toNumber(costPrice)) *
+                        toNumber(quantity)
                   )}
                 />
               </div>
@@ -1069,6 +1088,7 @@ function TextInput({
   type = "text",
   required,
   error,
+  disabled,
 }: {
   id: string
   label: string
@@ -1078,6 +1098,7 @@ function TextInput({
   type?: string
   required?: boolean
   error?: string
+  disabled?: boolean
 }) {
   return (
     <div className="space-y-2">
@@ -1090,6 +1111,7 @@ function TextInput({
         type={type}
         inputMode={type === "number" ? "decimal" : undefined}
         min={type === "number" ? "0" : undefined}
+        disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}

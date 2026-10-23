@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useI18n } from "@/lib/i18n/provider"
-import type { LocalShopProduct } from "@/app/lib/local-shops"
+import { describeProduct, type LocalShopProduct } from "@/app/lib/local-shops"
 
 export type ProductMode = "existing" | "new"
 
@@ -76,7 +76,7 @@ export function OrderProductFields({
           items={products.map((product) => ({
             value: product.id,
             label: product.name,
-            description: product.note || undefined,
+            description: describeProduct(product) || undefined,
           }))}
           value={productId}
           onChange={(value) => {

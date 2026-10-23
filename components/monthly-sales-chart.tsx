@@ -14,7 +14,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatMoney } from "@/app/lib/currency"
+import { formatMoney, getProfit } from "@/app/lib/currency"
 import type { Currency, LocalOrder } from "@/app/lib/local-orders"
 import { useI18n } from "@/lib/i18n/provider"
 import { dateLocale } from "@/lib/i18n/runtime"
@@ -78,10 +78,10 @@ export function MonthlySalesChart({ orders, currency, month }: Props) {
 
       const date = new Date(order.createdAt)
 
-      days[date.getDate() - 1].sales += order.totalCustomerPayable
-      days[date.getDate() - 1].profit += order.profit
-      total += order.totalCustomerPayable
-      totalProfit += order.profit
+      days[date.getDate() - 1].sales += order.totalSellingPrice
+      days[date.getDate() - 1].profit += getProfit(order)
+      total += order.totalSellingPrice
+      totalProfit += getProfit(order)
       monthOrders.push(order)
     }
 
@@ -108,8 +108,8 @@ export function MonthlySalesChart({ orders, currency, month }: Props) {
           order.customerName,
           order.orderStatus,
           order.paymentStatus,
-          Math.round(order.totalCustomerPayable),
-          Math.round(order.profit),
+          Math.round(order.totalSellingPrice),
+          Math.round(getProfit(order)),
         ]
       }),
       [],

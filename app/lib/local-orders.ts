@@ -40,48 +40,39 @@ export const PAYMENT_STATUSES = Object.keys(PAYMENT_STATUS_LABELS) as PaymentSta
 export type LocalOrder = {
   id: string
   orderNumber: string
+  // Links to the customer, product and cargo company. The names, the shop and
+  // the product details below are read from those rows, not stored on the order.
+  customerId?: string
+  productId?: string
+  cargoId?: string
   customerName: string
+  facebookName?: string
+  phone?: string
+  address?: string
+  shopId?: string
+  retailerName?: string
+  productName?: string
+  productVariant?: string // the product's size, variant and color in one line
+  productDetails?: { size: string; variant: string; color: string }
+  productPrice?: number // the product's current price per unit
+  cargoName?: string
 
   orderStatus: OrderStatus
   paymentStatus: PaymentStatus
 
-  // Amounts are plain numbers in the account's primary currency (profile).
-  // customerCurrency and exchangeRate only matter when the order has a second
-  // currency: exchangeRate means 1 primary currency = N customerCurrency.
-  customerCurrency: Currency
-  exchangeRate: number
+  // Plain numbers in the account's primary currency (profile). The retailer
+  // total is the product price x quantity when the order was saved. The
+  // selling total is typed by the user and can include delivery and so on.
+  quantity: number
+  totalRetailerPrice: number
+  totalSellingPrice: number
 
-  totalRetailerCost: number
-  totalCustomerPayable: number
-  totalPaid: number
-  remainingBalance: number
-  profit: number
-
-  createdAt: string
-  updatedAt?: string
-
-  facebookName?: string
-  phone?: string
-  address?: string
-
-  sourceType?: string
   customerMessageBurmese?: string
-  productSize?: string
-  productColor?: string
-  productDescription?: string
   productPhotoName?: string
   // Files in the Supabase "photos" bucket.
   productPhotoPath?: string
   orderScreenshotPath?: string
 
-  productName?: string
-  productOption?: string
-  quantity?: number
-  productNote?: string
-
-  retailerName?: string
-  cargoName?: string
-
-  retailerUnitPrice?: number
-  sellingUnitPrice?: number
+  createdAt: string
+  updatedAt?: string
 }

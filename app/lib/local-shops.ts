@@ -2,9 +2,23 @@ export type LocalShopProduct = {
   id: string
   name: string
   price: number
-  note: string // variants such as color and size
+  size: string
+  variant: string
+  color: string
   imagePath?: string // file in the Supabase "photos" bucket
   updatedAt?: string
+}
+
+// "M · Red · Cotton": the filled-in size, variant and color of a product.
+export function describeProduct(product: {
+  size?: string
+  variant?: string
+  color?: string
+}) {
+  return [product.size, product.variant, product.color]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" · ")
 }
 
 export type LocalShop = {

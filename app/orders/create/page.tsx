@@ -29,12 +29,10 @@ import { UpgradeLink } from "@/components/upgrade-link"
 import { focusFirstError } from "@/lib/form-errors"
 import {
   aiReadsLeft,
-  canUseSecondCurrency,
   fetchAiQuota,
   fetchProfile,
   type AiQuota,
 } from "@/lib/profile"
-import { type Currency } from "../../lib/local-orders"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/client"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -107,7 +105,6 @@ const FIELD_ORDER = [
   "quantity",
   "costPrice",
   "sellingPrice",
-  "exchangeRate",
 ]
 
 type PickMode = "existing" | "new"
@@ -233,6 +230,7 @@ export default function CreateOrderPage() {
 
   const [productName, setProductName] = useState("")
   const [productSize, setProductSize] = useState("")
+  const [productVariant, setProductVariant] = useState("")
   const [productColor, setProductColor] = useState("")
   const [quantity, setQuantity] = useState("1")
   const [costPrice, setCostPrice] = useState("")
@@ -241,7 +239,6 @@ export default function CreateOrderPage() {
 
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("not_paid")
   const [orderStatus, setOrderStatus] = useState<OrderStatus>("not_bought")
-  const [amountPaid, setAmountPaid] = useState("")
 
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null)
   const [saveScreenshot, setSaveScreenshot] = useState(false)
@@ -270,11 +267,6 @@ export default function CreateOrderPage() {
     extractionId: number
   } | null>(null)
   const [isPro, setIsPro] = useState(false)
-  const [baseCurrency, setBaseCurrency] = useState<Currency>("MMK")
-  // Pro accounts with a second currency charge the customer in it. Everyone
-  // else charges in the primary currency at a rate of 1.
-  const [secondCurrency, setSecondCurrency] = useState<Currency | null>(null)
-  const [exchangeRate, setExchangeRate] = useState("")
 
   useEffect(() => {
     let cancelled = false
@@ -317,14 +309,6 @@ export default function CreateOrderPage() {
 
       setAiQuota(quota)
       setIsPro(profile.plan === "pro")
-      setBaseCurrency(profile.baseCurrency)
-
-      if (canUseSecondCurrency(profile) && profile.secondaryCurrency) {
-        setSecondCurrency(profile.secondaryCurrency)
-        setExchangeRate(
-          profile.defaultExchangeRate ? String(profile.defaultExchangeRate) : ""
-        )
-      }
     }
 
     void loadRecords()
@@ -377,7 +361,7 @@ export default function CreateOrderPage() {
     setProductName((value) => value || data.productName)
     setProductSize((value) => value || data.productSize)
     setProductColor((value) => value || data.productColor)
-    if (data.productColor || data.customerMessage || data.productDescription) {
+    if (data.customerMessage || data.productDescription) {
       setShowMoreProduct(true)
     }
     setCustomerMessage(
@@ -394,9 +378,13 @@ export default function CreateOrderPage() {
       }
     }
     if (data.quantity > 1) setQuantity(String(data.quantity))
+    // The extracted price is for one item; the form takes the order total.
     setSellingPrice(
       (value) =>
-        value || (data.sellingPrice ? String(data.sellingPrice) : "")
+        value ||
+        (data.sellingPrice
+          ? String(data.sellingPrice * Math.max(data.quantity, 1))
+          : "")
     )
 
     const match = findMatchingCustomer(customers, {
@@ -630,12 +618,22 @@ export default function CreateOrderPage() {
     }
   }
 
+  // A saved product's price is changed on the product, not on the order.
+  const priceLocked =
+    shopMode === "existing" &&
+    productMode === "existing" &&
+    !!shops
+      .find((shop) => shop.id === selectedShopId)
+      ?.products.some((product) => product.id === selectedProductId)
+
   async function pickProduct(product: LocalShopProduct) {
     setSelectedProductId(product.id)
     setProductName(product.name)
-    setProductSize(product.note)
+    setProductSize(product.size)
+    setProductVariant(product.variant)
+    setProductColor(product.color)
     setCostPrice(product.price ? String(product.price) : "")
-    clearFieldError("productName", "productSize", "costPrice")
+    clearFieldError("productName", "costPrice")
     setProductPhotoFile(null)
     setProductPhotoPreview("")
 
@@ -662,6 +660,7 @@ export default function CreateOrderPage() {
     setError("")
 
     const trimmedSize = productSize.trim()
+    const trimmedVariant = productVariant.trim()
     const trimmedColor = productColor.trim()
     const trimmedProductName = productName.trim()
     const quantityNumber = Number(quantity.trim())
@@ -686,7 +685,6 @@ export default function CreateOrderPage() {
     }
 
     if (!trimmedProductName) problems.productName = t("Enter the product name")
-    if (!trimmedSize) problems.productSize = t("Enter the size or variant")
 
     if (!quantity.trim() || !Number.isInteger(quantityNumber) || quantityNumber < 1) {
       problems.quantity = t("Quantity must be at least 1")
@@ -696,12 +694,8 @@ export default function CreateOrderPage() {
       problems.costPrice = t("Enter the cost price")
     }
 
-    if (secondCurrency && !(Number(exchangeRate) > 0)) {
-      problems.exchangeRate = t("Enter an exchange rate greater than 0")
-    }
-
     if (sellingPrice.trim() === "" || !(Number(sellingPrice) > 0)) {
-      problems.sellingPrice = t("Enter a selling price above 0")
+      problems.sellingPrice = t("Enter a total selling price above 0")
     }
 
     setFieldErrors(problems)
@@ -712,49 +706,35 @@ export default function CreateOrderPage() {
       return
     }
 
-    // Customer: a saved one, or a new one that is saved with the order.
-    let customer: {
-      name: string
-      facebookName: string
-      phone: string
-      address: string
-    }
+    // The order stores ids. A saved customer is used as is; a new one is
+    // created below, unless a saved customer already matches it.
+    let customerId = customerMode === "existing" ? (selectedCustomer?.key ?? "") : ""
     let newCustomer: CustomerInput | null = null
 
-    if (customerMode === "existing" && selectedCustomer) {
-      customer = {
-        name: selectedCustomer.name,
-        facebookName: selectedCustomer.facebookName,
-        phone: selectedCustomer.phone,
-        address: selectedCustomer.address,
-      }
-    } else {
-      customer = {
+    if (customerMode !== "existing") {
+      newCustomer = {
         name: customerName.trim(),
         facebookName: facebookName.trim(),
         phone: phone.trim(),
         address: location.trim(),
+        otherContacts: otherContacts.trim(),
       }
-      newCustomer = { ...customer, otherContacts: otherContacts.trim() }
     }
 
-    // Shop: a saved one, or a new one that is saved with the order.
-    let shopName = ""
+    // Shop: a saved one, or a new one that is created below.
     let shopId = ""
     let newShop: ShopInput | null = null
 
     if (shopMode === "existing") {
-      shopName = shops.find((shop) => shop.id === selectedShopId)?.name ?? ""
       shopId = selectedShopId
     } else {
-      shopName = newShopName.trim()
+      const shopName = newShopName.trim()
 
       const sameName = shops.find(
         (shop) => shop.name.trim().toLowerCase() === shopName.toLowerCase()
       )
 
       if (sameName) {
-        shopName = sameName.name
         shopId = sameName.id
       } else {
         newShop = {
@@ -782,15 +762,18 @@ export default function CreateOrderPage() {
             ?.products.find((product) => product.id === selectedProductId)
         : undefined
     const shopProducts = shops.find((shop) => shop.id === selectedShopId)?.products ?? []
-    const isNewProduct =
-      !(productMode === "existing" && pickedProduct) &&
-      !(
-        shopMode === "existing" &&
-        shopProducts.some(
-          (product) =>
-            product.name.trim().toLowerCase() === trimmedProductName.toLowerCase()
-        )
-      )
+    const sameNameProduct = shopProducts.find(
+      (product) =>
+        product.name.trim().toLowerCase() === trimmedProductName.toLowerCase()
+    )
+    // A saved product keeps its own price; the order only multiplies it.
+    const existingProduct =
+      (productMode === "existing" ? pickedProduct : undefined) ??
+      (shopMode === "existing" ? sameNameProduct : undefined)
+    let productId = existingProduct?.id
+    const unitPrice = existingProduct ? existingProduct.price : costPriceNumber
+    const isNewProduct = !productId
+    let productRowSaved = false
 
     try {
       // Photos go to Supabase Storage. Both are optional. A new product's
@@ -820,92 +803,58 @@ export default function CreateOrderPage() {
         }
       }
 
-      const totalRetailerCost = costPriceNumber * quantityNumber
-      const totalCustomerPayable = sellingPriceNumber * quantityNumber
+      const totalRetailerPrice = unitPrice * quantityNumber
 
-      const totalPaid =
-        paymentStatus === "fully_paid" || paymentStatus === "refunded"
-          ? totalCustomerPayable
-          : paymentStatus === "partially_paid"
-            ? Math.min(toNumber(amountPaid), totalCustomerPayable)
-            : 0
-      const remainingBalance =
-        paymentStatus === "refunded"
-          ? 0
-          : Math.max(totalCustomerPayable - totalPaid, 0)
+      // Create what is new first, so the order can point to it by id. These
+      // rows stay if saving the order fails afterwards; they are normal records.
+      if (newCustomer) {
+        const key = getCustomerKey(newCustomer)
+        const saved = await listCustomers()
+
+        customerId =
+          saved.find((item) => getCustomerKey(item) === key)?.id ??
+          (await insertCustomer(newCustomer)).id
+      }
+
+      if (newShop) shopId = (await insertShop(newShop)).id
+
+      if (shopId && isNewProduct) {
+        productId = (
+          await insertProduct(shopId, {
+            name: trimmedProductName,
+            price: costPriceNumber,
+            size: trimmedSize,
+            variant: trimmedVariant,
+            color: trimmedColor,
+            imagePath: productImagePath,
+          })
+        ).id
+        productRowSaved = true
+      }
 
       // The order number and dates are set by the database.
       await insertOrder({
-        customerName: customer.name,
-
+        customerId,
+        productId,
+        customerName: "",
         orderStatus,
         paymentStatus,
-
-        customerCurrency: secondCurrency ?? baseCurrency,
-        exchangeRate: secondCurrency ? toNumber(exchangeRate) : 1,
-
-        totalRetailerCost,
-        totalCustomerPayable,
-        totalPaid,
-        remainingBalance,
-        profit: totalCustomerPayable - totalRetailerCost,
-
-        facebookName: customer.facebookName,
-        phone: customer.phone,
-        address: customer.address,
-
-        sourceType: "customer_chat",
-        customerMessageBurmese: customerMessage.trim(),
-        productName: trimmedProductName,
-        productOption: trimmedSize,
         quantity: quantityNumber,
-        productSize: trimmedSize,
-        productColor: trimmedColor,
-        productDescription: "",
-        productNote: "",
-        retailerName: shopName,
-        retailerUnitPrice: costPriceNumber,
-        sellingUnitPrice: sellingPriceNumber,
+        totalRetailerPrice,
+        totalSellingPrice: sellingPriceNumber,
+        customerMessageBurmese: customerMessage.trim(),
         productPhotoName: productPhotoFile?.name ?? "",
         productPhotoPath,
         orderScreenshotPath,
       })
     } catch (saveError) {
-      await removePhotos(uploadedPaths)
+      // A product photo that now belongs to a saved product must stay.
+      await removePhotos(
+        uploadedPaths.filter((path) => !(productRowSaved && path === productImagePath))
+      )
       setError(messageOf(saveError, t("Could not save the order")))
       setSaving(false)
       return
-    }
-
-    // The order already holds the customer and shop details, so a failure to
-    // save the new records does not undo the order.
-    if (newCustomer) {
-      try {
-        const key = getCustomerKey(newCustomer)
-        const saved = await listCustomers()
-
-        if (!saved.some((item) => getCustomerKey(item) === key)) {
-          await insertCustomer(newCustomer)
-        }
-      } catch {
-        // Ignored on purpose, see above.
-      }
-    }
-
-    // A new product is saved to its shop, which may be the new shop above.
-    try {
-      if (newShop) shopId = (await insertShop(newShop)).id
-
-      if (shopId && isNewProduct) {
-        await insertProduct(shopId, {
-          name: trimmedProductName,
-          price: costPriceNumber,
-          note: trimmedSize,
-          imagePath: productImagePath,
-        })
-      }
-    } catch {
-      await removePhotos([productImagePath])
     }
 
     router.push("/orders")
@@ -1291,18 +1240,29 @@ export default function CreateOrderPage() {
               placeholder={t("Nike Air Force 1, dress, bag...")}
             />
 
-            <TextField
-              id="productSize"
-              label={t("Size / variant")}
-              value={productSize}
-              onChange={(value) => {
-              setProductSize(value)
-              clearFieldError("productSize")
-            }}
-            required
-            error={fieldErrors.productSize}
-              placeholder={t("XS, 42, L...")}
-            />
+            <div className="grid grid-cols-3 gap-3">
+              <TextField
+                id="productSize"
+                label={t("Size")}
+                value={productSize}
+                onChange={setProductSize}
+                placeholder="S, M, 42"
+              />
+              <TextField
+                id="productVariant"
+                label={t("Variant")}
+                value={productVariant}
+                onChange={setProductVariant}
+                placeholder={t("Cotton, slim")}
+              />
+              <TextField
+                id="productColor"
+                label={t("Color")}
+                value={productColor}
+                onChange={setProductColor}
+                placeholder={t("Black, White")}
+              />
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <TextField
@@ -1322,6 +1282,7 @@ export default function CreateOrderPage() {
               <TextField
                 id="costPrice"
                 label={t("Cost price")}
+                disabled={priceLocked}
                 type="number"
                 inputMode="decimal"
                 min="0"
@@ -1338,7 +1299,7 @@ export default function CreateOrderPage() {
 
             <TextField
               id="sellingPrice"
-              label={t("Selling price")}
+              label={t("Total selling price")}
               type="number"
               inputMode="decimal"
               min="0"
@@ -1352,37 +1313,12 @@ export default function CreateOrderPage() {
               placeholder="0"
             />
 
-            {secondCurrency ? (
-              <TextField
-                id="exchangeRate"
-                label={`${t("Exchange rate")} (1 ${baseCurrency} = ? ${secondCurrency})`}
-                type="number"
-                inputMode="decimal"
-                min="0"
-                value={exchangeRate}
-                onChange={(value) => {
-                  setExchangeRate(value)
-                  clearFieldError("exchangeRate")
-                }}
-                required
-                error={fieldErrors.exchangeRate}
-                placeholder="0"
-              />
-            ) : null}
-
             <OptionalSection
-              label={t("Color, note or photo")}
+              label={t("Note or photo")}
               open={showMoreProduct}
               onOpenChange={setShowMoreProduct}
-              hasValue={!!(productColor.trim() || customerMessage.trim() || productPhotoFile)}
+              hasValue={!!(customerMessage.trim() || productPhotoFile)}
             >
-            <TextField
-              id="productColor"
-              label={t("Color")}
-              value={productColor}
-              onChange={setProductColor}
-              placeholder={t("White, black...")}
-            />
             <div className="space-y-2">
               <Label htmlFor="customerMessage">{t("Customer note")}</Label>
               <Textarea
@@ -1433,19 +1369,6 @@ export default function CreateOrderPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            {paymentStatus === "partially_paid" ? (
-              <TextField
-                id="amountPaid"
-                label={t("Amount paid so far")}
-                type="number"
-                inputMode="decimal"
-                min="0"
-                value={amountPaid}
-                onChange={setAmountPaid}
-                placeholder="0"
-              />
-            ) : null}
 
             <div className="space-y-2">
               <Label htmlFor="orderStatus">{t("Order status")}</Label>
@@ -1579,6 +1502,7 @@ function TextField({
   min,
   required,
   error,
+  disabled,
 }: {
   id: string
   label: string
@@ -1590,6 +1514,7 @@ function TextField({
   min?: string
   required?: boolean
   error?: string
+  disabled?: boolean
 }) {
   return (
     <div className="space-y-2">
@@ -1602,6 +1527,7 @@ function TextField({
         type={type}
         inputMode={inputMode}
         min={min}
+        disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}

@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  describeProduct,
   emptyShopDraft,
   type LocalShop,
   type LocalShopProduct,
@@ -66,6 +67,7 @@ import { createClient } from "@/lib/supabase/client"
 import { messageOf } from "@/lib/db/shared"
 import {
   deleteProduct,
+  updateProduct,
   deleteShop,
   insertProduct,
   listShops,
@@ -80,14 +82,18 @@ type ShopDraft = typeof emptyShopDraft
 type ProductDraft = {
   name: string
   price: string
-  note: string
+  size: string
+  variant: string
+  color: string
   imageDataUrl: string
 }
 
 const emptyProductDraft: ProductDraft = {
   name: "",
   price: "",
-  note: "",
+  size: "",
+  variant: "",
+  color: "",
   imageDataUrl: "",
 }
 
@@ -109,6 +115,8 @@ export default function ShopsPage() {
   const [editing, setEditing] = useState(false)
   const [editDraft, setEditDraft] = useState<ShopDraft>(emptyShopDraft)
   const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft)
+  // The product being changed in the product form; null when adding a new one.
+  const [editingProductId, setEditingProductId] = useState<string | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [busy, setBusy] = useState(false)
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
@@ -260,6 +268,39 @@ export default function ShopsPage() {
 
     if (!selectedShop) return
 
+    // Changing a saved product: orders keep the total they were made with.
+    if (editingProductId) {
+      const saved = await run(async () => {
+        const product = await updateProduct(editingProductId, {
+          name: productDraft.name.trim(),
+          price: toNumber(productDraft.price),
+          size: productDraft.size.trim(),
+          variant: productDraft.variant.trim(),
+          color: productDraft.color.trim(),
+        })
+
+        setShops((current) =>
+          current.map((shop) =>
+            shop.id === selectedShop.id
+              ? {
+                  ...shop,
+                  products: shop.products.map((item) =>
+                    item.id === product.id ? { ...item, ...product } : item
+                  ),
+                }
+              : shop
+          )
+        )
+      }, t("Product saved"))
+
+      if (saved) {
+        setProductDraft(emptyProductDraft)
+        setEditingProductId(null)
+      }
+
+      return
+    }
+
     const saved = await run(async () => {
       const imagePath = productDraft.imageDataUrl
         ? await uploadPhoto(productDraft.imageDataUrl, "products")
@@ -271,7 +312,9 @@ export default function ShopsPage() {
         product = await insertProduct(selectedShop.id, {
           name: productDraft.name.trim(),
           price: toNumber(productDraft.price),
-          note: productDraft.note.trim(),
+          size: productDraft.size.trim(),
+          variant: productDraft.variant.trim(),
+          color: productDraft.color.trim(),
           imagePath,
         })
       } catch (error) {
@@ -299,6 +342,23 @@ export default function ShopsPage() {
     }, t("Product added"))
 
     if (saved) setProductDraft(emptyProductDraft)
+  }
+
+  function handleEditProduct(product: LocalShopProduct) {
+    setEditingProductId(product.id)
+    setProductDraft({
+      name: product.name,
+      price: product.price ? String(product.price) : "",
+      size: product.size,
+      variant: product.variant,
+      color: product.color,
+      imageDataUrl: "",
+    })
+  }
+
+  function handleCancelProductEdit() {
+    setEditingProductId(null)
+    setProductDraft(emptyProductDraft)
   }
 
   async function handleRemoveProduct(product: LocalShopProduct) {
@@ -467,7 +527,10 @@ export default function ShopsPage() {
               onProductChange={(key, value) =>
                 setProductDraft((current) => ({ ...current, [key]: value }))
               }
+              editingProductId={editingProductId}
               onAddProduct={handleAddProduct}
+              onEditProduct={handleEditProduct}
+              onCancelProductEdit={handleCancelProductEdit}
               onRemoveProduct={handleRemoveProduct}
             />
           ) : null}
@@ -528,7 +591,10 @@ function ShopDetail({
   onSaveEdit,
   onDelete,
   onProductChange,
+  editingProductId,
   onAddProduct,
+  onEditProduct,
+  onCancelProductEdit,
   onRemoveProduct,
 }: {
   shop: LocalShop
@@ -548,7 +614,10 @@ function ShopDetail({
   onSaveEdit: (event: FormEvent<HTMLFormElement>) => void
   onDelete: () => void
   onProductChange: (key: keyof ProductDraft, value: string) => void
+  editingProductId: string | null
   onAddProduct: (event: FormEvent<HTMLFormElement>) => void
+  onEditProduct: (product: LocalShopProduct) => void
+  onCancelProductEdit: () => void
   onRemoveProduct: (product: LocalShopProduct) => void
 }) {
   const { t } = useI18n()
@@ -707,9 +776,9 @@ function ShopDetail({
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{product.name}</p>
-                  {product.note ? (
-                    <p className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">
-                      {product.note}
+                  {describeProduct(product) ? (
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {describeProduct(product)}
                     </p>
                   ) : null}
                   <p className="mt-0.5 text-muted-foreground">
@@ -731,6 +800,16 @@ function ShopDetail({
                   variant="ghost"
                   size="icon"
                   className="size-8 shrink-0 rounded-lg text-muted-foreground"
+                  aria-label={`Edit ${product.name}`}
+                  onClick={() => onEditProduct(product)}
+                >
+                  <IconPencil className="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 shrink-0 rounded-lg text-muted-foreground"
                   aria-label={`Remove ${product.name}`}
                   onClick={() => onRemoveProduct(product)}
                 >
@@ -743,7 +822,7 @@ function ShopDetail({
 
         <form onSubmit={onAddProduct} className="space-y-3 rounded-2xl border p-3">
           <div className="flex items-center gap-2 text-sm font-medium">
-            <IconPackage className="size-4 text-muted-foreground" />{t("Add Product")}</div>
+            <IconPackage className="size-4 text-muted-foreground" />{editingProductId ? t("Edit Product") : t("Add Product")}</div>
           <TextInput
             id="productName"
             label={t("Product name")}
@@ -752,11 +831,13 @@ function ShopDetail({
             placeholder={t("Dress, shoes, bag")}
             required
           />
-          <ProductImageInput
-            id="productImage"
-            value={productDraft.imageDataUrl}
-            onChange={(value) => onProductChange("imageDataUrl", value)}
-          />
+          {editingProductId ? null : (
+            <ProductImageInput
+              id="productImage"
+              value={productDraft.imageDataUrl}
+              onChange={(value) => onProductChange("imageDataUrl", value)}
+            />
+          )}
           <TextInput
             id="productPrice"
             label={t("Price")}
@@ -765,20 +846,43 @@ function ShopDetail({
             placeholder="0"
             type="number"
           />
-          <div className="space-y-2">
-            <Label htmlFor="productNote">{t("Variants (color, size)")}</Label>
-            <Textarea
-              id="productNote"
-              value={productDraft.note}
-              onChange={(event) => onProductChange("note", event.target.value)}
-              placeholder={t("Black, White / S, M, L")}
-              className="min-h-20 rounded-xl text-base"
+          <div className="grid grid-cols-3 gap-3">
+            <TextInput
+              id="productSize"
+              label={t("Size")}
+              value={productDraft.size}
+              onChange={(value) => onProductChange("size", value)}
+              placeholder="S, M, 42"
+            />
+            <TextInput
+              id="productVariant"
+              label={t("Variant")}
+              value={productDraft.variant}
+              onChange={(value) => onProductChange("variant", value)}
+              placeholder={t("Cotton, slim")}
+            />
+            <TextInput
+              id="productColor"
+              label={t("Color")}
+              value={productDraft.color}
+              onChange={(value) => onProductChange("color", value)}
+              placeholder={t("Black, White")}
             />
           </div>
           <Button type="submit" variant="outline" className="h-11 w-full rounded-xl" disabled={busy}>
             <IconPlus className="mr-2 size-5" />
-            {busy ? t("Saving...") : t("Add Product")}
+            {busy ? t("Saving...") : editingProductId ? t("Save Product") : t("Add Product")}
           </Button>
+          {editingProductId ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11 w-full rounded-xl"
+              onClick={onCancelProductEdit}
+            >
+              {t("Cancel")}
+            </Button>
+          ) : null}
         </form>
       </div>
     </>

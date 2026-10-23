@@ -7,13 +7,9 @@ import {
   type LocalOrder,
 } from "@/app/lib/local-orders"
 
-// A balance is left and the order is not settled or refunded.
+// The order is not paid or only partly paid. (Refunded orders count as settled.)
 export function isUnpaid(order: LocalOrder) {
-  return (
-    order.remainingBalance > 0 &&
-    order.paymentStatus !== "fully_paid" &&
-    order.paymentStatus !== "refunded"
-  )
+  return order.paymentStatus === "not_paid" || order.paymentStatus === "partially_paid"
 }
 
 // Reads a filter from the URL. Anything unknown means "all".

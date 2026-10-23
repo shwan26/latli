@@ -14,7 +14,7 @@ import {
   YAxis,
 } from "recharts"
 
-import { formatMoney } from "@/app/lib/currency"
+import { formatMoney, getProfit } from "@/app/lib/currency"
 import type { Currency, LocalOrder } from "@/app/lib/local-orders"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useI18n } from "@/lib/i18n/provider"
@@ -116,8 +116,8 @@ export function ProCharts({ orders, currency }: Props) {
         profit: 0,
         sort: date.getTime(),
       }
-      current.sales += order.totalCustomerPayable
-      current.profit += order.profit
+      current.sales += order.totalSellingPrice
+      current.profit += getProfit(order)
       values.set(key, current)
     }
 
@@ -125,11 +125,11 @@ export function ProCharts({ orders, currency }: Props) {
   }, [activeOrders])
 
   const customers = useMemo(
-    () => aggregate(activeOrders, (order) => order.customerName, (order) => order.totalCustomerPayable),
+    () => aggregate(activeOrders, (order) => order.customerName, (order) => order.totalSellingPrice),
     [activeOrders]
   )
   const shops = useMemo(
-    () => aggregate(activeOrders, (order) => order.retailerName ?? "", (order) => order.totalCustomerPayable),
+    () => aggregate(activeOrders, (order) => order.retailerName ?? "", (order) => order.totalSellingPrice),
     [activeOrders]
   )
   const completeProducts = useMemo(
@@ -157,7 +157,7 @@ export function ProCharts({ orders, currency }: Props) {
       aggregate(
         orders.filter((order) => order.paymentStatus === "refunded"),
         (order) => order.productName ?? "",
-        (order) => order.totalPaid
+        (order) => order.totalSellingPrice
       ),
     [orders]
   )

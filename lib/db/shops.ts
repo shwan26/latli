@@ -7,7 +7,9 @@ type ProductRow = {
   id: string
   name: string
   price: number
-  note: string
+  size: string
+  variant: string
+  color: string
   image_path: string | null
   updated_at: string
 }
@@ -36,7 +38,9 @@ export type ShopInput = {
 export type ProductInput = {
   name: string
   price: number
-  note: string
+  size: string
+  variant: string
+  color: string
   imagePath?: string
   createdAt?: string
 }
@@ -46,7 +50,9 @@ function productFromRow(row: ProductRow): LocalShopProduct {
     id: row.id,
     name: row.name,
     price: Number(row.price),
-    note: row.note,
+    size: row.size,
+    variant: row.variant,
+    color: row.color,
     imagePath: row.image_path ?? undefined,
     updatedAt: row.updated_at,
   }
@@ -129,10 +135,34 @@ export async function insertProduct(shopId: string, product: ProductInput) {
       shop_id: shopId,
       name: product.name,
       price: product.price,
-      note: product.note,
+      size: product.size,
+      variant: product.variant,
+      color: product.color,
       image_path: product.imagePath ?? null,
       ...(product.createdAt ? { created_at: product.createdAt } : {}),
     })
+    .select("*")
+    .single<ProductRow>()
+
+  check(error, "Could not save the product")
+
+  return productFromRow(data!)
+}
+
+export async function updateProduct(
+  id: string,
+  product: Pick<ProductInput, "name" | "price" | "size" | "variant" | "color">
+) {
+  const { data, error } = await getDb()
+    .from("shop_products")
+    .update({
+      name: product.name,
+      price: product.price,
+      size: product.size,
+      variant: product.variant,
+      color: product.color,
+    })
+    .eq("id", id)
     .select("*")
     .single<ProductRow>()
 

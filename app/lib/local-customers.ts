@@ -1,5 +1,5 @@
-import { getOrderRate, hasSecondCurrency } from "./currency"
-import type { Currency } from "./local-orders"
+import { isUnpaid } from "@/lib/order-filters"
+
 import type { LocalOrder } from "./local-orders"
 
 export type LocalCustomer = {
@@ -28,20 +28,16 @@ export type CustomerSummary = {
   phone: string
   address: string
   otherContacts: string
-  saved: boolean
   orderCount: number
-  total: number
-  totalMmk: number
-  unpaid: number
-  // total and unpaid are plain amounts in the primary currency. totalMmk is in
-  // customerCurrency, which is null when the latest order has no second currency.
-  customerCurrency: Currency | null
+  total: number // plain amount in the primary currency
+  unpaid: number // number of orders not fully paid
   lastOrderAt: string
   createdAt: string
 }
 
-// Orders and saved customers are matched by phone, then Facebook name, then
-// customer name.
+// Two saved customers count as the same person when they share a phone, else
+// a Facebook name, else a name. Used to stop duplicates and to match what the
+// AI read from a screenshot.
 export function getCustomerKey(fields: {
   name?: string
   facebookName?: string
@@ -54,18 +50,8 @@ export function getCustomerKey(fields: {
   return phone || facebook || name || ""
 }
 
-export function getOrderCustomerKey(order: LocalOrder) {
-  return (
-    getCustomerKey({
-      name: order.customerName,
-      facebookName: order.facebookName,
-      phone: order.phone,
-    }) || order.id
-  )
-}
-
-// One summary per customer: every saved customer, plus customers that only
-// exist on orders.
+// One summary per saved customer. The key is the customer's id, which is also
+// what orders store (order.customerId).
 export function buildCustomerSummaries(
   customers: LocalCustomer[],
   orders: LocalOrder[]
@@ -73,59 +59,29 @@ export function buildCustomerSummaries(
   const summaries = new Map<string, CustomerSummary>()
 
   for (const customer of customers) {
-    const key = getCustomerKey(customer)
-
-    if (!key || summaries.has(key)) continue
-
-    summaries.set(key, {
-      key,
+    summaries.set(customer.id, {
+      key: customer.id,
       name: customer.name,
       facebookName: customer.facebookName,
       phone: customer.phone,
       address: customer.address,
       otherContacts: customer.otherContacts,
-      saved: true,
       orderCount: 0,
       total: 0,
-      totalMmk: 0,
       unpaid: 0,
-      customerCurrency: null,
       lastOrderAt: "",
       createdAt: customer.createdAt,
     })
   }
 
   for (const order of orders) {
-    const key = getOrderCustomerKey(order)
+    const summary = order.customerId ? summaries.get(order.customerId) : undefined
 
-    const summary =
-      summaries.get(key) ??
-      ({
-        key,
-        name: order.customerName || "Customer",
-        facebookName: order.facebookName || "",
-        phone: order.phone || "",
-        address: order.address || "",
-        otherContacts: "",
-        saved: false,
-        orderCount: 0,
-        total: 0,
-        totalMmk: 0,
-        unpaid: 0,
-        customerCurrency: null,
-        lastOrderAt: "",
-        createdAt: order.createdAt,
-      } satisfies CustomerSummary)
-
-    const total = order.totalCustomerPayable || 0
+    if (!summary) continue
 
     summary.orderCount += 1
-    summary.total += total
-    summary.totalMmk += total * getOrderRate(order)
-    summary.unpaid += order.remainingBalance || 0
-    summary.customerCurrency = hasSecondCurrency(order)
-      ? order.customerCurrency
-      : null
+    summary.total += order.totalSellingPrice || 0
+    if (isUnpaid(order)) summary.unpaid += 1
 
     if (
       !summary.lastOrderAt ||
@@ -134,13 +90,6 @@ export function buildCustomerSummaries(
     ) {
       summary.lastOrderAt = order.createdAt
     }
-
-    // A customer that only exists on orders was created by its first order.
-    if (!summary.saved && order.createdAt < summary.createdAt) {
-      summary.createdAt = order.createdAt
-    }
-
-    summaries.set(key, summary)
   }
 
   return Array.from(summaries.values()).sort(
