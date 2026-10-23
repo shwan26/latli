@@ -202,7 +202,7 @@ In the app:
 
 ## 7. Give someone Pro access
 
-New accounts are `free` / `owner`. Every account can read screenshots with
+New accounts start on a 14-day Pro trial (`pro` with `plan_expires_at` 14 days out, then back to `free` automatically; see `20261024000000_pro_trial.sql`) and are `owner`. Every account can read screenshots with
 Gemini (Free: 10 a month). To lift that limit, run in the SQL Editor:
 
 ```sql
@@ -211,7 +211,7 @@ set plan = 'pro', role = 'owner'
 where email = 'manager@example.com';
 ```
 
-- To show an end date on the More page, also set `plan_expires_at = '2026-12-31'`.
+- To show an end date on the More page, also set `plan_expires_at = '2026-12-31'`. An hourly job moves the account back to Free once that date passes; leave it empty for no end date.
 - `plan = 'pro'` keeps photos for 6 months instead of 90 days. Changing the plan moves the dates of photos already saved: going back to Free deletes longer-kept photos 90 days later.
 - `plan = 'pro'` removes the 10 AI reads a month limit.
 

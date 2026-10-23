@@ -14,7 +14,6 @@ export async function PublicNavbar() {
   const links = [
     { href: "/pricing", label: t("Pricing") },
     { href: "/blog", label: t("Blog") },
-    { href: "/about", label: t("About") },
     { href: "/contact", label: t("Contact") },
   ]
 

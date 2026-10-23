@@ -1,7 +1,7 @@
 -- Pro subscription expiry date.
 --
--- Shown on the More page for Pro accounts. It is only a date to display: the
--- app does not downgrade an account when it passes. Like plan and role, users
+-- Shown on the More page for Pro accounts. From 20261024000000_pro_trial.sql on,
+-- an hourly job moves the account to Free when it passes. Like plan and role, users
 -- cannot change it (update on profiles is limited to a few columns), so set it
 -- here:
 --   update public.profiles

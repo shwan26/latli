@@ -16,13 +16,24 @@ export type ProfileSettings = {
   age: number | null
   gender: ProfileGender
   plan: ProfilePlan
-  // When Pro ends (ISO date). Shown only; set by an admin. Null if none is set.
+  // When Pro ends (ISO date). New accounts get a 14-day Pro trial; an hourly
+  // job moves the account to Free after this date. Null if none is set.
   planExpiresAt: string | null
   role: ProfileRole
   baseCurrency: Currency
   secondaryCurrency: Currency | null
   // 1 baseCurrency = defaultExchangeRate secondaryCurrency
   defaultExchangeRate: number | null
+}
+
+export const TRIAL_DAYS = 14
+
+// Days left on a Pro account that has an end date, rounded up. Null for Free
+// accounts, Pro accounts without an end date, and ended ones.
+export function proDaysLeft(profile: ProfileSettings): number | null {
+  if (profile.plan !== "pro" || !profile.planExpiresAt) return null
+  const msLeft = new Date(profile.planExpiresAt).getTime() - Date.now()
+  return msLeft > 0 ? Math.ceil(msLeft / 86_400_000) : null
 }
 
 export const DEFAULT_PROFILE: ProfileSettings = {
